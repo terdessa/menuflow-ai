@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import MenuCard from '@/components/MenuCard';
 import FilterPanel from '@/components/FilterPanel';
 import Navigation from '@/components/Navigation';
@@ -32,6 +33,7 @@ function HomePageContent() {
   const [uploading, setUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [currentMenuId, setCurrentMenuId] = useState(null);
+  const [shareUrl, setShareUrl] = useState('');
 
   // Generate images for all menu items in parallel
   // menuIdOverride ensures we persist URLs to the correct saved menu
@@ -132,7 +134,7 @@ function HomePageContent() {
                 console.log(`✅ Image generated for: ${dishesToGenerate[promiseIndex].dish.name}`, result.imageUrl);
                 // Persist updated menu if we have an id
                 if (targetMenuId) {
-                  updateSavedMenu(targetMenuId, updatedMenu);
+                  void updateSavedMenu(targetMenuId, updatedMenu);
                 }
                 return updatedMenu;
               });
@@ -162,29 +164,33 @@ function HomePageContent() {
       });
     }
 
-    // Check if we should load a saved menu from URL
     const menuId = searchParams.get('menu');
-    if (menuId) {
-      const savedMenu = getMenuById(menuId);
-      if (savedMenu && savedMenu.menu) {
+    if (!menuId) {
+      setShareUrl('');
+      return;
+    }
+
+    void (async () => {
+      try {
+        const savedMenu = await getMenuById(menuId);
+        if (!savedMenu?.menu) return;
+
         setCurrentMenuId(menuId);
+        setShareUrl(savedMenu.publicUrl || `/menu/${menuId}`);
         setMenu(savedMenu.menu);
 
-        // Generate images for saved menu only if some are missing
         const hasMissingImages = Object.keys(savedMenu.menu || {}).some((section) =>
           (savedMenu.menu?.[section] || []).some((dish) => !dish.imageUrl)
         );
         if (hasMissingImages) {
           setTimeout(() => {
-            generateImagesForMenu(
-              savedMenu.menu,
-              'detailed',
-              menuId
-            );
+            generateImagesForMenu(savedMenu.menu, 'detailed', menuId);
           }, 100);
         }
+      } catch (error) {
+        console.error('Failed to load saved menu:', error);
       }
-    }
+    })();
   // generateImagesForMenu intentionally closes over the latest menu id for background image updates.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -226,26 +232,25 @@ function HomePageContent() {
           });
 
           // Auto-save menu
-          const saved = saveMenu({
+          return saveMenu({
             restaurantName: 'Uploaded Menu',
             location: 'Unknown',
             language: 'English',
             menu: normalizedMenu,
+          }).then((saved) => {
+            const savedMenuId = saved?.id || null;
+            if (saved?.id) {
+              setCurrentMenuId(saved.id);
+              setShareUrl(saved.publicUrl || `/menu/${saved.id}`);
+            }
+
+            setMenu(normalizedMenu);
+            setUploading(false);
+
+            setTimeout(() => {
+              generateImagesForMenu(normalizedMenu, 'detailed', savedMenuId);
+            }, 100);
           });
-          const savedMenuId = saved?.id || null;
-          if (saved?.id) {
-            setCurrentMenuId(saved.id);
-          }
-
-          // Set menu first - show immediately without waiting for images
-          setMenu(normalizedMenu);
-          setUploading(false);
-
-          // Generate images asynchronously in the background
-          // Images will update individually as they complete
-          setTimeout(() => {
-            generateImagesForMenu(normalizedMenu, 'detailed', savedMenuId);
-          }, 100);
         })
         .catch((error) => {
           console.error('Error processing menu:', error);
@@ -345,13 +350,23 @@ function HomePageContent() {
             {/* Controls */}
             <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
               <h2 className="text-2xl font-bold">Menu</h2>
-              <button
-                onClick={() => setIsFilterOpen(true)}
-                className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--card-bg)] px-4 py-2 font-medium hover:bg-[var(--border)] transition-colors"
-              >
-                <span>🔍</span>
-                Filters
-              </button>
+              <div className="flex flex-wrap items-center gap-3">
+                {shareUrl && (
+                  <Link
+                    href={shareUrl}
+                    className="rounded-lg border border-[var(--border)] bg-[var(--card-bg)] px-4 py-2 text-sm font-medium transition-colors hover:bg-[var(--border)]"
+                  >
+                    Shareable Page
+                  </Link>
+                )}
+                <button
+                  onClick={() => setIsFilterOpen(true)}
+                  className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--card-bg)] px-4 py-2 font-medium transition-colors hover:bg-[var(--border)]"
+                >
+                  <span>🔍</span>
+                  Filters
+                </button>
+              </div>
             </div>
 
             {/* Menu Sections */}

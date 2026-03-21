@@ -1,79 +1,39 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Navigation from '@/components/Navigation';
 import { getSavedMenus, deleteMenuById, clearSavedMenus } from '@/lib/storage';
 
 export default function SavedMenusPage() {
   const router = useRouter();
-  const [menus, setMenus] = useState(() => getSavedMenus());
+  const [menus, setMenus] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const savedMenus = await getSavedMenus();
+        setMenus(savedMenus);
+      } catch (error) {
+        console.error('Failed to load menus', error);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   const handleOpenMenu = (menuId) => {
-    // In a real app, this would navigate to the menu view
-    // For now, we'll navigate to home and load the menu
     router.push(`/?menu=${menuId}`);
   };
 
   const handleDeleteMenu = async (menuId) => {
-    const menuToDelete = menus.find((m) => m.id === menuId);
-    if (!menuToDelete) return;
-
-    // Collect associated image URLs for cleanup
-    const imageUrls = [];
-    if (menuToDelete.menu) {
-      Object.values(menuToDelete.menu).forEach((dishes) => {
-        dishes.forEach((dish) => {
-          if (dish?.imageUrl) {
-            imageUrls.push(dish.imageUrl);
-          }
-        });
-      });
-    }
-
-    // Attempt to delete menu images from server storage
-    if (imageUrls.length > 0) {
-      try {
-        await fetch('/api/delete-menu-images', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageUrls }),
-        });
-      } catch (error) {
-        console.error('Failed to delete menu images', error);
-      }
-    }
-
-    deleteMenuById(menuId);
+    await deleteMenuById(menuId);
     setMenus((prev) => prev.filter((m) => m.id !== menuId));
   };
 
   const handleDeleteAll = async () => {
-    // Gather all image urls
-    const imageUrls = [];
-    menus.forEach((menu) => {
-      if (menu?.menu) {
-        Object.values(menu.menu).forEach((dishes) => {
-          dishes.forEach((dish) => {
-            if (dish?.imageUrl) imageUrls.push(dish.imageUrl);
-          });
-        });
-      }
-    });
-
-    if (imageUrls.length > 0) {
-      try {
-        await fetch('/api/delete-menu-images', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageUrls }),
-        });
-      } catch (error) {
-        console.error('Failed to delete menu images', error);
-      }
-    }
-
-    clearSavedMenus();
+    await clearSavedMenus();
     setMenus([]);
   };
 
@@ -97,7 +57,11 @@ export default function SavedMenusPage() {
           )}
         </div>
 
-        {menus.length === 0 ? (
+        {loading ? (
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--card-bg)] p-12 text-center">
+            <p className="text-[var(--text-secondary)]">Loading menus...</p>
+          </div>
+        ) : menus.length === 0 ? (
           <div className="rounded-xl border border-[var(--border)] bg-[var(--card-bg)] p-12 text-center">
             <div className="mb-4 text-6xl">📋</div>
             <h3 className="mb-2 text-xl font-semibold">No saved menus yet</h3>
@@ -133,6 +97,9 @@ export default function SavedMenusPage() {
                       {menu.language && (
                         <span>🌐 {menu.language}</span>
                       )}
+                      {menu.publicUrl && (
+                        <span className="truncate">🔗 {menu.publicUrl}</span>
+                      )}
                       {menu.menu && (
                         <span>
                           🍽️{' '}
@@ -146,6 +113,20 @@ export default function SavedMenusPage() {
                     </div>
                   </div>
                   <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const publicUrl = `${window.location.origin}${menu.publicUrl || `/menu/${menu.id}`}`;
+                        try {
+                          await navigator.clipboard.writeText(publicUrl);
+                        } catch (error) {
+                          console.error('Failed to copy link', error);
+                        }
+                      }}
+                      className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-4 py-2 text-sm font-medium transition-colors hover:bg-[var(--border)]"
+                    >
+                      Copy Link
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

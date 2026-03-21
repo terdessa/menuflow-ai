@@ -1,8 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-import crypto from 'crypto';
 
 export const runtime = 'nodejs';
 
@@ -59,42 +56,6 @@ export async function POST(request) {
     const imagePrompt =
       `${dishName}${ingredientsText}; ${styleDesc}; ${sharedScene}; ${subjectBlock}; ${sharedConstraints}`;
 
-    // For now, using a placeholder approach - in production, integrate with actual image generation API
-    // You can use services like:
-    // - OpenAI DALL-E
-    // - Stability AI
-    // - Or use Gemini's image generation capabilities if available
-
-    // Placeholder: Return a description that can be used with an image generation service
-    // In a real implementation, you would call an image generation API here
-
-    // Generate a unique filename based on dish name
-    const sanitizeFilename = (str) => {
-      return str
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '')
-        .substring(0, 50);
-    };
-
-    const filename = `${sanitizeFilename(dishName)}-${crypto.randomBytes(4).toString('hex')}.png`;
-    const imagesDir = path.join(process.cwd(), 'public', 'menu-images');
-    const filePath = path.join(imagesDir, filename);
-    const publicUrl = `/menu-images/${filename}`;
-
-    // Ensure directory exists
-    if (!fs.existsSync(imagesDir)) {
-      fs.mkdirSync(imagesDir, { recursive: true });
-    }
-
-    // Check if image already exists
-    if (fs.existsSync(filePath)) {
-      return NextResponse.json({
-        imageUrl: publicUrl,
-        generated: true,
-      });
-    }
-
     // Generate image using Google GenAI (single retry on failure)
     try {
       console.log(`Generating image for: ${dishName} with prompt: ${imagePrompt}`);
@@ -119,11 +80,13 @@ export async function POST(request) {
         });
 
         let imageBuffer = null;
+        let mimeType = 'image/png';
         if (response.candidates && response.candidates[0] && response.candidates[0].content) {
           for (const part of response.candidates[0].content.parts) {
             if (part.inlineData) {
               console.log('🖼️  Found image data (format:', part.inlineData.mimeType || 'unknown', ')');
               const imageData = part.inlineData.data;
+              mimeType = part.inlineData.mimeType || mimeType;
               imageBuffer = Buffer.from(imageData, 'base64');
               console.log('✅ Image decoded from base64, size:', imageBuffer.length, 'bytes');
               break;
@@ -135,14 +98,17 @@ export async function POST(request) {
           throw new Error('No image data in API response');
         }
 
-        return imageBuffer;
+        return { imageBuffer, mimeType };
       };
 
       let imageBuffer = null;
+      let mimeType = 'image/png';
       let lastError = null;
       for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         try {
-          imageBuffer = await generateOnce();
+          const generated = await generateOnce();
+          imageBuffer = generated.imageBuffer;
+          mimeType = generated.mimeType;
           break;
         } catch (err) {
           lastError = err;
@@ -158,20 +124,17 @@ export async function POST(request) {
         throw lastError || new Error('Image generation failed');
       }
 
-      // Save to local file
-      fs.writeFileSync(filePath, imageBuffer);
-
-      console.log(`✅ Image generated and saved locally: ${publicUrl}`);
+      const imageDataUrl = `data:${mimeType};base64,${imageBuffer.toString('base64')}`;
 
       return NextResponse.json({
-        imageUrl: publicUrl,
+        imageUrl: imageDataUrl,
         generated: true,
       });
     } catch (fetchError) {
       console.error('Error generating image with Google GenAI:', fetchError);
 
       return NextResponse.json(
-        { error: 'Failed to generate and save image', details: fetchError.message },
+        { error: 'Failed to generate image', details: fetchError.message },
         { status: 500 }
       );
     }
