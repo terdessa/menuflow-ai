@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import {
   attachSessionCookie,
   clearMenusForOwner,
@@ -7,6 +7,7 @@ import {
   getSessionIdFromRequest,
   listMenusForOwner,
 } from '@/lib/server/menu-store';
+import { generateMissingImagesForMenu } from '@/lib/server/generate-menu-images';
 
 const withSession = (request) => {
   const existing = getSessionIdFromRequest(request);
@@ -38,6 +39,13 @@ export async function POST(request) {
     const { sessionId, isNew } = withSession(request);
     const payload = await request.json();
     const menu = await createMenuForOwner(sessionId, payload);
+    after(async () => {
+      try {
+        await generateMissingImagesForMenu(menu.id, 'detailed');
+      } catch (error) {
+        console.error('Background menu image generation failed:', error);
+      }
+    });
     const response = NextResponse.json({ menu }, { status: 201 });
     if (isNew) {
       attachSessionCookie(response, sessionId);

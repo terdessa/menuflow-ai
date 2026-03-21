@@ -6,7 +6,7 @@ import Link from 'next/link';
 import MenuCard from '@/components/MenuCard';
 import FilterPanel from '@/components/FilterPanel';
 import Navigation from '@/components/Navigation';
-import { getPreferences, saveMenu, getMenuById, updateSavedMenu } from '@/lib/storage';
+import { getPreferences, saveMenu, getMenuById } from '@/lib/storage';
 import { MENU_SECTIONS, ICON_TYPES, CURRENCIES } from '@/lib/constants';
 
 const DEFAULT_FILTERS = {
@@ -14,6 +14,22 @@ const DEFAULT_FILTERS = {
   customAllergies: '',
   excludeIngredients: [],
   spiceTolerance: 'medium',
+};
+
+const getInitialFilters = (storedPreferences) => {
+  if (!storedPreferences) {
+    return DEFAULT_FILTERS;
+  }
+
+  return {
+    ...DEFAULT_FILTERS,
+    allergies: storedPreferences.allergies || [],
+    customAllergies: storedPreferences.customAllergies || '',
+    excludeIngredients: storedPreferences.dislikedIngredients
+      ? storedPreferences.dislikedIngredients.split(',').map((i) => i.trim())
+      : [],
+    spiceTolerance: storedPreferences.spiceTolerance || 'medium',
+  };
 };
 
 export default function HomePage() {
@@ -26,147 +42,26 @@ export default function HomePage() {
 
 function HomePageContent() {
   const searchParams = useSearchParams();
-  const [preferences, setPreferences] = useState(null);
+  const [preferences] = useState(() => getPreferences());
   const [menu, setMenu] = useState(null);
-  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState(() => getInitialFilters(getPreferences()));
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [currentMenuId, setCurrentMenuId] = useState(null);
-  const [shareUrl, setShareUrl] = useState('');
+  const shareUrl = currentMenuId ? `/menu/${currentMenuId}` : '';
 
-  // Generate images for all menu items in parallel
-  // menuIdOverride ensures we persist URLs to the correct saved menu
-  const generateImagesForMenu = (menuData, imageStyle, menuIdOverride = null) => {
-    try {
-      if (!menuData) return;
-      const targetMenuId = menuIdOverride || currentMenuId;
-
-      // Collect all dishes that need images
-      const dishesToGenerate = [];
-
-      Object.keys(menuData).forEach((section) => {
-        if (Array.isArray(menuData[section])) {
-          menuData[section].forEach((dish, index) => {
-            if (!dish.imageUrl) {
-              dishesToGenerate.push({ dish, section, index });
-            }
-          });
-        }
-      });
-
-      if (dishesToGenerate.length === 0) {
-        console.log('No dishes need image generation - all images ready');
-        return;
-      }
-
-      // Rate limiting: use NEXT_PUBLIC_IMAGE_GEN_RPM (requests per minute), default 20
-      const rateLimitPerMinute = Number(process.env.NEXT_PUBLIC_IMAGE_GEN_RPM) || 20;
-      const delayBetweenRequestsMs =
-        rateLimitPerMinute > 0 ? Math.floor(60000 / rateLimitPerMinute) : 0;
-
-      console.log(
-        `Generating ${dishesToGenerate.length} images with spacing ${delayBetweenRequestsMs}ms (rpm=${rateLimitPerMinute})`
-      );
-
-      // Generate all images in parallel
-      const imagePromises = dishesToGenerate.map(({ dish, section, index }, promiseIndex) => {
-        const startDelay = delayBetweenRequestsMs * promiseIndex;
-
-        return new Promise((resolve) => {
-          setTimeout(async () => {
-            try {
-              const response = await fetch('/api/generate-image', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  dishName: dish.name,
-                  ingredients: dish.ingredients,
-                  imageStyle: imageStyle,
-                  type: section && section.toLowerCase().includes('drink') ? 'drink' : 'dish',
-                }),
-              });
-
-              if (!response.ok) {
-                throw new Error(`Failed to generate image for ${dish.name}`);
-              }
-
-              const data = await response.json();
-              resolve({
-                section,
-                index,
-                imageUrl: data.imageUrl,
-              });
-            } catch (error) {
-              console.error(`Error generating image for ${dish.name}:`, error);
-              resolve(null);
-            }
-          }, startDelay);
-        });
-      });
-
-      // Process images as they complete - update each dish individually
-      imagePromises.forEach((promise, promiseIndex) => {
-        promise
-          .then((result) => {
-            if (result && result.imageUrl) {
-              // Update menu state with the new image URL immediately
-              setMenu((prevMenu) => {
-                if (!prevMenu || !prevMenu[result.section]) {
-                  console.warn('Menu state not ready for update', result);
-                  return prevMenu;
-                }
-
-                // Create a completely new menu object to ensure React detects the change
-                const updatedMenu = {};
-                Object.keys(prevMenu).forEach((section) => {
-                  updatedMenu[section] = prevMenu[section].map((dish, idx) => {
-                    if (section === result.section && idx === result.index) {
-                      // Create new dish object with imageUrl
-                      return { ...dish, imageUrl: result.imageUrl };
-                    }
-                    return dish;
-                  });
-                });
-
-                console.log(`✅ Image generated for: ${dishesToGenerate[promiseIndex].dish.name}`, result.imageUrl);
-                // Persist updated menu if we have an id
-                if (targetMenuId) {
-                  void updateSavedMenu(targetMenuId, updatedMenu);
-                }
-                return updatedMenu;
-              });
-            }
-          })
-          .catch((error) => {
-            console.error(`Error generating image for ${dishesToGenerate[promiseIndex].dish.name}:`, error);
-          });
-      });
-    } catch (error) {
-      console.error('Image generation batch failed:', error);
-    }
-  };
+  const hasMissingImages = (menuData) =>
+    Boolean(
+      menuData &&
+      Object.values(menuData).some(
+        (dishes) => Array.isArray(dishes) && dishes.some((dish) => !dish?.imageUrl)
+      )
+    );
 
   useEffect(() => {
-    const stored = getPreferences();
-    if (stored) {
-      setPreferences(stored);
-      setFilters({
-        ...DEFAULT_FILTERS,
-        allergies: stored.allergies || [],
-        customAllergies: stored.customAllergies || '',
-        excludeIngredients: stored.dislikedIngredients
-          ? stored.dislikedIngredients.split(',').map((i) => i.trim())
-          : [],
-        spiceTolerance: stored.spiceTolerance || 'medium',
-      });
-    }
-
     const menuId = searchParams.get('menu');
     if (!menuId) {
-      setShareUrl('');
       return;
     }
 
@@ -175,31 +70,38 @@ function HomePageContent() {
         const savedMenu = await getMenuById(menuId);
         if (!savedMenu?.menu) return;
 
-        setCurrentMenuId(menuId);
-        setShareUrl(savedMenu.publicUrl || `/menu/${menuId}`);
+        setCurrentMenuId(savedMenu.id || menuId);
         setMenu(savedMenu.menu);
-
-        const hasMissingImages = Object.keys(savedMenu.menu || {}).some((section) =>
-          (savedMenu.menu?.[section] || []).some((dish) => !dish.imageUrl)
-        );
-        if (hasMissingImages) {
-          setTimeout(() => {
-            generateImagesForMenu(savedMenu.menu, 'detailed', menuId);
-          }, 100);
-        }
       } catch (error) {
         console.error('Failed to load saved menu:', error);
       }
     })();
-  // generateImagesForMenu intentionally closes over the latest menu id for background image updates.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!currentMenuId || !hasMissingImages(menu)) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      void (async () => {
+        try {
+          const refreshedMenu = await getMenuById(currentMenuId);
+          if (refreshedMenu?.menu) {
+            setMenu(refreshedMenu.menu);
+          }
+        } catch (error) {
+          console.error('Failed to refresh menu images:', error);
+        }
+      })();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [currentMenuId, menu]);
 
   // Process uploaded images through API
   useEffect(() => {
     if (uploadedFiles.length > 0 && !menu) {
-      setUploading(true);
-
       // Upload images to API
       const formData = new FormData();
       uploadedFiles.forEach((file) => {
@@ -238,18 +140,12 @@ function HomePageContent() {
             language: 'English',
             menu: normalizedMenu,
           }).then((saved) => {
-            const savedMenuId = saved?.id || null;
             if (saved?.id) {
               setCurrentMenuId(saved.id);
-              setShareUrl(saved.publicUrl || `/menu/${saved.id}`);
             }
 
-            setMenu(normalizedMenu);
+            setMenu(saved?.menu || normalizedMenu);
             setUploading(false);
-
-            setTimeout(() => {
-              generateImagesForMenu(normalizedMenu, 'detailed', savedMenuId);
-            }, 100);
           });
         })
         .catch((error) => {
@@ -259,16 +155,16 @@ function HomePageContent() {
           setUploadedFiles([]); // Reset to allow retry
         });
     }
-  // generateImagesForMenu intentionally stays out of deps to avoid retriggering uploads on re-render.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uploadedFiles, menu]);
 
 
   const handleFileUpload = (e) => {
     const files = Array.from(e.target.files);
     if (files.length > 0) {
+      setUploading(true);
       setUploadedFiles(files);
       setMenu(null); // Reset menu to trigger new load
+      setCurrentMenuId(null);
     }
   };
 
@@ -368,6 +264,13 @@ function HomePageContent() {
                 </button>
               </div>
             </div>
+
+            {currentMenuId && hasMissingImages(menu) && (
+              <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Shareable page is live now. Dish images are still being generated in the
+                background and will appear here automatically.
+              </div>
+            )}
 
             {/* Menu Sections */}
             <div className="space-y-8">

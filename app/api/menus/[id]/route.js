@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import {
   attachSessionCookie,
   createSessionId,
@@ -7,6 +7,7 @@ import {
   getSessionIdFromRequest,
   updateMenuForOwner,
 } from '@/lib/server/menu-store';
+import { generateMissingImagesForMenu, menuHasMissingImages } from '@/lib/server/generate-menu-images';
 
 const withSession = (request) => {
   const existing = getSessionIdFromRequest(request);
@@ -23,6 +24,17 @@ export async function GET(_request, { params }) {
     if (!menu) {
       return NextResponse.json({ error: 'Menu not found' }, { status: 404 });
     }
+
+    if (menuHasMissingImages(menu.menu) && menu.imageGenerationStatus !== 'in_progress') {
+      after(async () => {
+        try {
+          await generateMissingImagesForMenu(id, 'detailed');
+        } catch (error) {
+          console.error('Failed to resume menu image generation:', error);
+        }
+      });
+    }
+
     return NextResponse.json({ menu });
   } catch (error) {
     return NextResponse.json(
