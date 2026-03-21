@@ -2,8 +2,10 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { loadServerEnv } from '@/lib/serverEnv';
 
 export const runtime = 'nodejs';
+loadServerEnv();
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -68,6 +70,12 @@ export async function POST(request) {
         "ingredients": "List of ingredients",
         "price": 12.99,
         "icons": ["allergen-warning", "recommended"],
+        "nutritionPer100g": {
+          "calories": 120,
+          "protein": 6.5,
+          "carbs": 14.2,
+          "fat": 4.8
+        },
         "filterProperties": {
           "allergies": [],
           "spiceLevel": "mild",
@@ -99,6 +107,13 @@ IMPORTANT RULES:
    - texture: one of ["crispy", "soft", "creamy", "crunchy", "tender", "smooth", "chewy", "flaky"] or null
    - meatType: one of ["chicken", "beef", "pork", "lamb", "turkey", "duck", "seafood", "fish"] or null
 4. Add "allergen-warning" to icons only when the dish contains one or more allergens
+4. For nutritionPer100g:
+   - estimate approximate nutrition per 100 grams for the prepared dish
+   - calories must be a number in kcal
+   - protein, carbs, and fat must be numbers in grams
+   - ALWAYS include all four keys: calories, protein, carbs, fat
+   - use your best reasonable estimate from the dish name, ingredients, and typical preparation style
+   - return numbers only, with no units in the JSON
 5. Add "recommended" to icons array for popular or chef's special items
 6. Extract prices accurately - use numbers only (no currency symbols)
 7. Translate names and ingredients into ${targetLanguage}; if text is already in ${targetLanguage}, keep it as is
@@ -109,7 +124,7 @@ IMPORTANT RULES:
 12. For "Desserts" and "Drinks", leave allergies as an empty array unless the menu explicitly states allergens
 13. When inferring allergies for non-drink, non-dessert dishes, be conservative and comprehensive: consider common preparation variations, sauces, coatings, broths, marinades, garnishes, fryer cross-use, hidden binders, dairy or egg enrichment, soy-based seasonings, gluten in breading or sauces, nuts or sesame in pesto or toppings, shellfish/seafood stock, sulfites in preserved ingredients, and mustard/celery in dressings or bases
 14. If a non-drink, non-dessert dish could reasonably contain multiple allergens depending on how it is commonly prepared, include all plausible allergens in the allergies array
-15. Analyze ingredients carefully to determine filter properties
+15. Analyze ingredients carefully to determine filter properties and nutrition estimates
 
 Return the JSON now:`;
 
@@ -163,6 +178,12 @@ Return the JSON now:`;
       jsonText = jsonText.replace(/^```json\n?/, '').replace(/\n?```$/, '');
     } else if (jsonText.startsWith('```')) {
       jsonText = jsonText.replace(/^```\n?/, '').replace(/\n?```$/, '');
+    }
+
+    const firstBraceIndex = jsonText.indexOf('{');
+    const lastBraceIndex = jsonText.lastIndexOf('}');
+    if (firstBraceIndex !== -1 && lastBraceIndex !== -1) {
+      jsonText = jsonText.slice(firstBraceIndex, lastBraceIndex + 1);
     }
 
     // Parse JSON
@@ -222,6 +243,17 @@ Return the JSON now:`;
       return deduplicateArray(Array.isArray(allergies) ? allergies : []);
     };
 
+    const normalizeNumericValue = (value) => {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+      }
+      if (typeof value === 'string') {
+        const parsed = parseFloat(value.replace(/[^0-9.-]/g, ''));
+        return Number.isFinite(parsed) ? parsed : null;
+      }
+      return null;
+    };
+
     // Normalize each menu item to ensure consistent structure
     Object.keys(normalizedMenu).forEach((section) => {
       normalizedMenu[section] = normalizedMenu[section].map((item) => {
@@ -240,6 +272,12 @@ Return the JSON now:`;
           ingredients: item.ingredients || '',
           price: typeof item.price === 'number' ? item.price : parseFloat(item.price) || 0,
           icons: normalizedIcons,
+          nutritionPer100g: {
+            calories: normalizeNumericValue(item.nutritionPer100g?.calories),
+            protein: normalizeNumericValue(item.nutritionPer100g?.protein),
+            carbs: normalizeNumericValue(item.nutritionPer100g?.carbs),
+            fat: normalizeNumericValue(item.nutritionPer100g?.fat),
+          },
           filterProperties: {
             ...filterProperties,
             allergies: normalizedAllergies,

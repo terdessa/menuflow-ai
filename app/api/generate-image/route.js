@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { generateImageDataUrl } from '@/lib/server/generate-menu-images';
+import { loadServerEnv } from '@/lib/serverEnv';
 
 export const runtime = 'nodejs';
+loadServerEnv();
 
 export async function POST(request) {
   try {
