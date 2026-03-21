@@ -370,6 +370,7 @@ function HomePageContent() {
                         <MenuCard
                           key={`${sectionName}-${index}-${dish.imageUrl || 'no-image'}`}
                           dish={dish}
+                          sectionName={sectionName}
                           currency={selectedCurrency}
                           showImages
                         />
