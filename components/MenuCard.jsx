@@ -94,8 +94,8 @@ export default function MenuCard({
     ? filterProperties.allergies
     : [];
   const dietaryTags = [];
-  if (filterProperties.isVegetarian) dietaryTags.push('Vegetarian');
   if (filterProperties.isVegan) dietaryTags.push('Vegan');
+  else if (filterProperties.isVegetarian) dietaryTags.push('Vegetarian');
   if (filterProperties.isGlutenFree) dietaryTags.push('GF');
   if (filterProperties.isHalal) dietaryTags.push('Halal');
   if (filterProperties.isPescatarian) dietaryTags.push('Pesc.');

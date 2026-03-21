@@ -22,14 +22,6 @@ const MapPinIcon = () => (
   </svg>
 );
 
-const GlobeIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/>
-    <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
-    <path d="M2 12h20"/>
-  </svg>
-);
-
 const CalendarIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/>
@@ -235,11 +227,8 @@ export default function PublicMenuClient({
                     {menuRecord.location}
                   </span>
                 )}
-                {menuRecord.language && (
-                  <span className="inline-flex items-center gap-1">
-                    <GlobeIcon />
-                    {menuRecord.language}
-                  </span>
+                {menuRecord.language && menuRecord.language !== 'auto' && menuRecord.language !== 'Auto' && (
+                  <span>{menuRecord.language}</span>
                 )}
                 {menuRecord.createdAt && (
                   <span className="inline-flex items-center gap-1">

@@ -63,6 +63,9 @@ export async function POST(request) {
     const prompt = `Analyze the menu images provided and extract all menu items. Translate every extracted item name and ingredients into ${targetLanguage} while keeping meanings accurate. Return a strictly formatted JSON object with the following structure:
 
 {
+  "menuMetadata": {
+    "suggestedTitle": "Restaurant name or concise cuisine title"
+  },
   "sections": {
     "Soups": [
       {
@@ -79,6 +82,8 @@ export async function POST(request) {
         "filterProperties": {
           "allergies": [],
           "spiceLevel": "mild",
+          "isVegan": false,
+          "isVegetarian": false,
           "alcoholType": null,
           "cookingStyle": "steamed",
           "tasteProfile": ["savoury"],
@@ -101,6 +106,8 @@ IMPORTANT RULES:
 3. For filterProperties:
    - allergies: array of allergens present: ["nuts", "gluten", "dairy", "eggs", "seafood", "soy", "shellfish", "sesame", "sulfites", "mustard", "celery", "lupin", "molluscs"]
    - spiceLevel: one of "none", "mild", "medium", "hot", "very-hot"
+   - isVegan: boolean, true only if the dish is clearly vegan
+   - isVegetarian: boolean, true only if the dish is clearly vegetarian or vegan
    - alcoholType: one of ["wine", "beer", "cocktail", "prosecco", "spirits", "champagne", "sake", "cider"] or null
    - cookingStyle: one of ["grilled", "fried", "baked", "raw", "steamed", "roasted", "boiled", "sauteed", "braised", "smoked"] or null
    - tasteProfile: array from: ["sweet", "savoury", "salty", "sour", "bitter", "umami", "spicy", "tangy"]
@@ -125,6 +132,7 @@ IMPORTANT RULES:
 13. When inferring allergies for non-drink, non-dessert dishes, be conservative and comprehensive: consider common preparation variations, sauces, coatings, broths, marinades, garnishes, fryer cross-use, hidden binders, dairy or egg enrichment, soy-based seasonings, gluten in breading or sauces, nuts or sesame in pesto or toppings, shellfish/seafood stock, sulfites in preserved ingredients, and mustard/celery in dressings or bases
 14. If a non-drink, non-dessert dish could reasonably contain multiple allergens depending on how it is commonly prepared, include all plausible allergens in the allergies array
 15. Analyze ingredients carefully to determine filter properties and nutrition estimates
+16. Set menuMetadata.suggestedTitle to the best short heading for this menu. Prefer the restaurant name if visible; otherwise use a concise cuisine or menu title like "Japanese Restaurant Menu" or "Traditional Italian Menu"
 
 Return the JSON now:`;
 
@@ -254,6 +262,38 @@ Return the JSON now:`;
       return null;
     };
 
+    const normalizeBoolean = (value) => {
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === 'true') return true;
+        if (normalized === 'false') return false;
+      }
+      return false;
+    };
+
+    const inferMenuTitle = () => {
+      const candidate =
+        menuData.menuMetadata?.suggestedTitle ||
+        menuData.suggestedTitle ||
+        menuData.restaurantName ||
+        '';
+
+      const trimmed = String(candidate).trim();
+      if (trimmed) return trimmed;
+
+      const sectionNames = Object.keys(normalizedMenu).filter(
+        (section) => Array.isArray(normalizedMenu[section]) && normalizedMenu[section].length > 0
+      );
+      if (sectionNames.includes('Drinks') && sectionNames.length === 1) {
+        return 'Drinks Menu';
+      }
+      if (sectionNames.includes('Desserts') && sectionNames.length === 1) {
+        return 'Dessert Menu';
+      }
+      return 'Restaurant Menu';
+    };
+
     // Normalize each menu item to ensure consistent structure
     Object.keys(normalizedMenu).forEach((section) => {
       normalizedMenu[section] = normalizedMenu[section].map((item) => {
@@ -282,11 +322,17 @@ Return the JSON now:`;
             ...filterProperties,
             allergies: normalizedAllergies,
             spiceLevel: normalizeSpiceLevel(section, filterProperties.spiceLevel),
+            isVegan: normalizeBoolean(filterProperties.isVegan),
+            isVegetarian:
+              normalizeBoolean(filterProperties.isVegetarian) ||
+              normalizeBoolean(filterProperties.isVegan),
           },
           imageUrl: item.imageUrl || null,
         };
       });
     });
+
+    const menuTitle = inferMenuTitle();
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const extractionFilename = `menu-extraction-${timestamp}.json`;
@@ -305,6 +351,7 @@ Return the JSON now:`;
             sourceImageCount: files.length,
             model,
             targetLanguage,
+            menuTitle,
             rawResponse: menuData,
             normalizedMenu,
           },
@@ -318,6 +365,7 @@ Return the JSON now:`;
 
     return NextResponse.json({
       menu: normalizedMenu,
+      menuTitle,
       savedJsonPath: extractionPath,
       savedJsonFilename: extractionFilename,
     });

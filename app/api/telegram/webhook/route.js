@@ -463,14 +463,15 @@ async function handlePhotoMessage(chatId, message) {
     }
 
     const menuContent = menuData.menu || menuData;
+    const menuTitle = menuData.menuTitle || 'Restaurant Menu';
 
     const saveRes = await fetch(`${APP_URL}/api/menus`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        restaurantName: 'Telegram Upload',
+        restaurantName: menuTitle,
         location: '',
-        language: 'auto',
+        language: menuData.language || 'English',
         menu: menuContent,
       }),
     });
