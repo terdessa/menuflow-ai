@@ -3,8 +3,10 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { loadServerEnv } from '@/lib/serverEnv';
 
 export const runtime = 'nodejs';
+loadServerEnv();
 
 export async function POST(request) {
   try {

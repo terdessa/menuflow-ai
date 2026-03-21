@@ -236,9 +236,20 @@ function HomePageContent() {
         method: 'POST',
         body: formData,
       })
-        .then((response) => {
+        .then(async (response) => {
           if (!response.ok) {
-            throw new Error(`API error: ${response.statusText}`);
+            let errorMessage = `API error: ${response.statusText}`;
+            try {
+              const errorData = await response.json();
+              if (errorData?.details) {
+                errorMessage = errorData.details;
+              } else if (errorData?.error) {
+                errorMessage = errorData.error;
+              }
+            } catch {
+              // Keep the status text fallback when the body is not JSON.
+            }
+            throw new Error(errorMessage);
           }
           return response.json();
         })
