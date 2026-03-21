@@ -275,24 +275,27 @@ export default function PublicMenuClient({
             </div>
           )}
 
-          {menuRecord.menuInsight && (
-            <div className="mt-3 rounded-2xl border border-[var(--border)] bg-[linear-gradient(135deg,rgba(198,134,66,0.12),rgba(198,134,66,0.03))] px-3.5 py-3 text-sm text-[var(--foreground)] shadow-sm">
-              <div className="flex items-start gap-2.5">
+        </div>
+
+        {menuRecord.menuInsight && (
+          <div className="border-t border-[var(--border)]/80">
+            <div className="mx-auto max-w-2xl px-4 py-2.5">
+              <div className="flex items-start gap-2.5 rounded-2xl bg-[linear-gradient(135deg,rgba(198,134,66,0.12),rgba(198,134,66,0.03))] px-3 py-2.5 text-sm text-[var(--foreground)] shadow-sm ring-1 ring-[var(--border)]/70">
                 <span className="mt-0.5 inline-flex shrink-0 rounded-full bg-[var(--primary)]/12 p-1.5 text-[var(--primary)]">
                   <SparklesIcon />
                 </span>
-                <div>
+                <div className="min-w-0">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--primary)]">
                     AI Menu Insight
                   </p>
-                  <p className="mt-1 leading-5 text-[var(--foreground)]/90">
+                  <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-[var(--foreground)]/90">
                     {menuRecord.menuInsight}
                   </p>
                 </div>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {availableSections.length > 1 && (
           <div className="mx-auto max-w-2xl px-4 pb-2">
