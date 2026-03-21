@@ -53,6 +53,7 @@ export default function MenuCard({
     ? dish.icons.filter((icon) => icon !== 'allergen-warning')
     : [];
   const nutritionItems = getNutritionItems(dish?.nutritionPer100g);
+  const personalization = dish.personalization || null;
 
   return (
     <div className="group animate-fade-in rounded-xl border border-[var(--border)] bg-[var(--card-bg)] p-4 shadow-sm transition-all hover:shadow-md">
@@ -80,6 +81,36 @@ export default function MenuCard({
           <p className="line-clamp-2 text-sm text-[var(--text-secondary)]">
             {dish.ingredients}
           </p>
+        )}
+
+        {personalization && (
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--background)]/70 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+                Personal Match
+              </p>
+              <div className="flex items-center gap-2">
+                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${getPersonalizationTone(personalization.status)}`}>
+                  {getPersonalizationLabel(personalization.status)}
+                </span>
+                <span className="text-sm font-semibold text-[var(--foreground)]">
+                  {personalization.score}/100
+                </span>
+              </div>
+            </div>
+            {personalization.reasons?.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {personalization.reasons.map((reason) => (
+                  <span
+                    key={reason}
+                    className="rounded-full bg-white px-2.5 py-1 text-xs text-[var(--text-secondary)]"
+                  >
+                    {reason}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {isTaggableSection && (
@@ -164,6 +195,18 @@ export default function MenuCard({
       </div>
     </div>
   );
+}
+
+function getPersonalizationLabel(status) {
+  if (status === 'avoid') return 'Avoid';
+  if (status === 'caution') return 'Caution';
+  return 'Great Match';
+}
+
+function getPersonalizationTone(status) {
+  if (status === 'avoid') return 'bg-red-100 text-red-800';
+  if (status === 'caution') return 'bg-amber-100 text-amber-800';
+  return 'bg-emerald-100 text-emerald-800';
 }
 
 function getNutritionItems(nutritionPer100g) {

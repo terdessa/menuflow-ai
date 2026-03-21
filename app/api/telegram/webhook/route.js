@@ -18,8 +18,6 @@ import {
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
-// ─── Main webhook handler ────────────────────────────────────────
-
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -41,8 +39,6 @@ export async function POST(request) {
   }
 }
 
-// ─── All onboarding states ───────────────────────────────────────
-
 const ONBOARDING_STATES = [
   'new', 'awaiting_allergies', 'awaiting_custom_allergies',
   'awaiting_spice', 'awaiting_diet', 'awaiting_excludes', 'awaiting_dish_prefs',
@@ -52,18 +48,26 @@ function isOnboardingState(state) {
   return ONBOARDING_STATES.includes(state);
 }
 
-// ─── Message handler ─────────────────────────────────────────────
-
 async function handleMessage(message) {
   const chatId = message.chat.id;
   const text = message.text?.trim() || '';
+  const startPayload = text.startsWith('/start ') ? text.slice(7).trim() : null;
 
   let user = await getTelegramUser(chatId);
   if (!user) {
     user = await upsertTelegramUser(chatId, { state: 'new' });
   }
 
-  // Commands
+  if (startPayload?.startsWith('connect_')) {
+    const menuId = startPayload.replace('connect_', '');
+    await upsertTelegramUser(chatId, { pending_menu_id: menuId });
+
+    if (user.state === 'ready') {
+      const refreshedUser = await getTelegramUser(chatId);
+      return sendProfileReadyMessage(chatId, refreshedUser, menuId);
+    }
+  }
+
   if (text === '/start') return startOnboarding(chatId);
   if (text === '/preferences') return startOnboarding(chatId);
 
@@ -73,7 +77,7 @@ async function handleMessage(message) {
       '📸 <b>How to use MenuFlow AI Bot</b>\n\n' +
       '1. Set up your preferences (allergies, spice, diet, etc.)\n' +
       '2. Send me a photo of a restaurant menu\n' +
-      '3. I\'ll analyze it and send you a personalized link!\n\n' +
+      '3. I\'ll analyze it and send you both generic and personalized links.\n\n' +
       '<b>Commands:</b>\n' +
       '/start - Start fresh\n' +
       '/preferences - Update your preferences\n' +
@@ -81,12 +85,10 @@ async function handleMessage(message) {
     );
   }
 
-  // Voice messages during onboarding
   if (message.voice && isOnboardingState(user.state)) {
     return handleVoiceOnboarding(chatId, message);
   }
 
-  // State-specific text input
   if (user.state === 'new' || user.state === 'awaiting_allergies') {
     return startOnboarding(chatId);
   }
@@ -103,7 +105,6 @@ async function handleMessage(message) {
     return handleDishPreferences(chatId, text);
   }
 
-  // Ready state
   if (user.state === 'ready') {
     if (message.photo && message.photo.length > 0) {
       return handlePhotoMessage(chatId, message);
@@ -116,7 +117,6 @@ async function handleMessage(message) {
     );
   }
 
-  // Photo during onboarding
   if (message.photo && message.photo.length > 0) {
     return sendMessage(
       chatId,
@@ -126,8 +126,6 @@ async function handleMessage(message) {
 
   return startOnboarding(chatId);
 }
-
-// ─── Onboarding start ────────────────────────────────────────────
 
 async function startOnboarding(chatId) {
   await upsertTelegramUser(chatId, {
@@ -157,8 +155,6 @@ async function startOnboarding(chatId) {
     buildAllergyKeyboard([])
   );
 }
-
-// ─── Transition helpers ──────────────────────────────────────────
 
 async function transitionToSpice(chatId) {
   await upsertTelegramUser(chatId, { state: 'awaiting_spice' });
@@ -205,17 +201,28 @@ async function transitionToDishPrefs(chatId) {
 async function transitionToReady(chatId) {
   await upsertTelegramUser(chatId, { state: 'ready' });
   const user = await getTelegramUser(chatId);
+  return sendProfileReadyMessage(chatId, user, user.pending_menu_id);
+}
+
+async function sendProfileReadyMessage(chatId, user, menuId = null) {
+  const genericMenuUrl = menuId ? `${APP_URL}/menu/${menuId}` : null;
+  const personalizedMenuUrl =
+    menuId && user.profile_token ? `${APP_URL}/menu/${menuId}/p/${user.profile_token}` : null;
+
+  await upsertTelegramUser(chatId, { pending_menu_id: null });
 
   return sendMessage(
     chatId,
     '🎉 <b>All set! Here\'s your profile:</b>\n\n' +
     formatUserProfile(user) + '\n\n' +
+    (personalizedMenuUrl
+      ? `👉 <a href="${genericMenuUrl}">Open generic menu</a>\n` +
+        `👉 <a href="${personalizedMenuUrl}">Open your personalized menu</a>\n\n`
+      : '') +
     '📸 <b>Now send me a photo of a restaurant menu!</b>',
     buildPreferencesKeyboard()
   );
 }
-
-// ─── Callback query handler ──────────────────────────────────────
 
 async function handleCallbackQuery(callbackQuery) {
   const chatId = callbackQuery.message.chat.id;
@@ -233,7 +240,6 @@ async function handleCallbackQuery(callbackQuery) {
     return startOnboarding(chatId);
   }
 
-  // ─── Allergy selection ───────────────────────────────────────
   if (data.startsWith('allergy:')) {
     const value = data.replace('allergy:', '');
 
@@ -278,7 +284,6 @@ async function handleCallbackQuery(callbackQuery) {
       );
     }
 
-    // Toggle standard allergy
     const currentAllergies = user.allergies || [];
     const updatedAllergies = currentAllergies.includes(value)
       ? currentAllergies.filter((a) => a !== value)
@@ -296,7 +301,6 @@ async function handleCallbackQuery(callbackQuery) {
     );
   }
 
-  // ─── Spice tolerance selection ───────────────────────────────
   if (data.startsWith('spice:')) {
     const spiceValue = data.replace('spice:', '');
     await answerCallbackQuery(callbackId, spiceValue === 'any' ? 'No preference' : `Spice: ${spiceValue}`);
@@ -312,7 +316,6 @@ async function handleCallbackQuery(callbackQuery) {
     return transitionToDiet(chatId);
   }
 
-  // ─── Diet type selection ─────────────────────────────────────
   if (data.startsWith('diet:')) {
     const dietValue = data.replace('diet:', '');
     await answerCallbackQuery(callbackId, dietValue === 'none' ? 'No restriction' : dietValue);
@@ -330,8 +333,6 @@ async function handleCallbackQuery(callbackQuery) {
 
   await answerCallbackQuery(callbackId);
 }
-
-// ─── Custom allergies handler ────────────────────────────────────
 
 async function handleCustomAllergies(chatId, text) {
   const customs = text.split(',').map((a) => a.trim().toLowerCase()).filter(Boolean);
@@ -352,8 +353,6 @@ async function handleCustomAllergies(chatId, text) {
   );
 }
 
-// ─── Exclude ingredients handler ─────────────────────────────────
-
 async function handleExcludeIngredients(chatId, text) {
   if (text === '/skip') {
     await upsertTelegramUser(chatId, { exclude_ingredients: [] });
@@ -365,8 +364,6 @@ async function handleExcludeIngredients(chatId, text) {
   return transitionToDishPrefs(chatId);
 }
 
-// ─── Dish preferences handler ────────────────────────────────────
-
 async function handleDishPreferences(chatId, text) {
   if (text === '/skip') {
     await upsertTelegramUser(chatId, { dish_preferences: [] });
@@ -377,8 +374,6 @@ async function handleDishPreferences(chatId, text) {
 
   return transitionToReady(chatId);
 }
-
-// ─── Voice onboarding handler ────────────────────────────────────
 
 async function handleVoiceOnboarding(chatId, message) {
   await sendMessage(chatId, '🎙 Processing your voice message...');
@@ -392,7 +387,6 @@ async function handleVoiceOnboarding(chatId, message) {
     const audioBuffer = await downloadFile(fileInfo.file_path);
     const prefs = await extractPreferencesFromVoice(audioBuffer);
 
-    // Save everything that was extracted
     await upsertTelegramUser(chatId, {
       allergies: prefs.allergies,
       custom_allergies: prefs.custom_allergies,
@@ -402,28 +396,16 @@ async function handleVoiceOnboarding(chatId, message) {
       dish_preferences: prefs.dish_preferences,
     });
 
-    // Show what was extracted
     const user = await getTelegramUser(chatId);
-
-    // Check what's still missing and go to the first missing step
     const nextStep = getNextMissingStep(user);
 
     if (nextStep === 'ready') {
-      // Everything was extracted
       await upsertTelegramUser(chatId, { state: 'ready' });
-
-      return sendMessage(
-        chatId,
-        '🎙 <b>Got it from your voice!</b>\n\n' +
-        formatUserProfile(user) + '\n\n' +
-        '📸 <b>Now send me a photo of a restaurant menu!</b>\n\n' +
-        '<i>Not right? Use /preferences to adjust manually.</i>',
-        buildPreferencesKeyboard()
-      );
+      const refreshedUser = await getTelegramUser(chatId);
+      return sendProfileReadyMessage(chatId, refreshedUser, refreshedUser.pending_menu_id);
     }
 
-    // Some fields missing — show what we got and ask for the rest
-    let extractedMsg = '🎙 <b>Got some preferences from your voice!</b>\n\n' +
+    const extractedMsg = '🎙 <b>Got some preferences from your voice!</b>\n\n' +
       formatUserProfile(user) + '\n\n' +
       'Let me ask about the rest:\n\n';
 
@@ -445,8 +427,6 @@ async function handleVoiceOnboarding(chatId, message) {
     );
   }
 }
-
-// ─── Photo handler (menu processing) ─────────────────────────────
 
 async function handlePhotoMessage(chatId, message) {
   await sendMessage(chatId, '⏳ Processing your menu...');
@@ -506,11 +486,18 @@ async function handlePhotoMessage(chatId, message) {
 
     const user = await getTelegramUser(chatId);
     const summary = buildMenuSummary(menuContent, user);
+    const personalizedUrl = user?.profile_token
+      ? `${APP_URL}/menu/${menuId}/p/${user.profile_token}`
+      : null;
 
     return sendMessage(
       chatId,
       `✅ <b>Menu analyzed!</b>\n\n${summary}\n\n` +
-      `👉 <a href="${menuUrl}">View full menu with filters</a>`,
+      `👉 <a href="${menuUrl}">Open generic menu</a>\n` +
+      (personalizedUrl
+        ? `👉 <a href="${personalizedUrl}">Open your personalized menu</a>\n`
+        : '') +
+      `🔐 <b>Your profile code:</b> <code>${user?.profile_token || 'Unavailable'}</code>`,
       buildPreferencesKeyboard()
     );
   } catch (error) {
@@ -519,19 +506,19 @@ async function handlePhotoMessage(chatId, message) {
   }
 }
 
-// ─── Menu summary builder ────────────────────────────────────────
-
 function buildMenuSummary(menu, user) {
   let totalDishes = 0;
   let safeCount = 0;
   const warningDishes = [];
 
-  const allAllergies = [...(user?.allergies || []), ...(user?.custom_allergies || [])];
-  const userSpice = user?.spice_tolerance;
-  const userDiet = user?.diet_type;
+  const userAllergies = [
+    ...(user?.allergies || []),
+    ...(user?.custom_allergies || []),
+  ];
+  const userSpice = user?.spice_tolerance || 'medium';
   const userExcludes = user?.exclude_ingredients || [];
   const spiceLevels = ['none', 'mild', 'medium', 'hot', 'very-hot'];
-  const userSpiceIndex = userSpice && userSpice !== 'any' ? spiceLevels.indexOf(userSpice) : -1;
+  const userSpiceIndex = spiceLevels.indexOf(userSpice);
 
   Object.entries(menu).forEach(([, dishes]) => {
     if (!Array.isArray(dishes)) return;
@@ -540,41 +527,21 @@ function buildMenuSummary(menu, user) {
       const fp = dish.filterProperties || {};
       let isSafe = true;
 
-      // Check allergies (standard + custom)
-      if (allAllergies.length > 0 && fp.allergies?.length > 0) {
-        const matchingAllergens = allAllergies.filter((a) => fp.allergies.includes(a));
+      if (userAllergies.length > 0 && fp.allergies?.length > 0) {
+        const matchingAllergens = userAllergies.filter((a) => fp.allergies.includes(a));
         if (matchingAllergens.length > 0) {
           isSafe = false;
           warningDishes.push(`⚠️ <b>${dish.name}</b> — contains ${matchingAllergens.join(', ')}`);
         }
       }
 
-      // Check custom allergies against ingredients text
-      if (user?.custom_allergies?.length > 0 && dish.ingredients) {
-        const ingredientsLower = dish.ingredients.toLowerCase();
-        const found = user.custom_allergies.filter((a) => ingredientsLower.includes(a));
-        if (found.length > 0) {
-          isSafe = false;
-          warningDishes.push(`⚠️ <b>${dish.name}</b> — may contain ${found.join(', ')}`);
-        }
-      }
-
-      // Check spice (skip if "any" or not set)
-      if (userSpiceIndex >= 0 && fp.spiceLevel) {
+      if (fp.spiceLevel && userSpice !== 'any') {
         const dishSpiceIndex = spiceLevels.indexOf(fp.spiceLevel);
         if (dishSpiceIndex > userSpiceIndex) {
           isSafe = false;
         }
       }
 
-      // Check diet type
-      if (userDiet && userDiet !== 'none' && fp.dietTypes) {
-        if (!fp.dietTypes.includes(userDiet)) {
-          isSafe = false;
-        }
-      }
-
-      // Check excluded ingredients
       if (userExcludes.length > 0 && dish.ingredients) {
         const ingredientsLower = dish.ingredients.toLowerCase();
         const found = userExcludes.filter((ex) => ingredientsLower.includes(ex));
@@ -589,7 +556,7 @@ function buildMenuSummary(menu, user) {
 
   const lines = [`🍽 <b>${totalDishes} dishes</b> found`];
 
-  if (allAllergies.length > 0 || userExcludes.length > 0 || (userDiet && userDiet !== 'none')) {
+  if (userAllergies.length > 0 || userExcludes.length > 0) {
     lines.push(`✅ <b>${safeCount}</b> match your preferences`);
     if (totalDishes - safeCount > 0) {
       lines.push(`⚠️ <b>${totalDishes - safeCount}</b> flagged based on your filters`);
@@ -599,10 +566,9 @@ function buildMenuSummary(menu, user) {
   if (warningDishes.length > 0) {
     lines.push('');
     lines.push('<b>Allergy alerts:</b>');
-    const unique = [...new Set(warningDishes)];
-    unique.slice(0, 5).forEach((w) => lines.push(w));
-    if (unique.length > 5) {
-      lines.push(`...and ${unique.length - 5} more`);
+    warningDishes.slice(0, 5).forEach((warning) => lines.push(warning));
+    if (warningDishes.length > 5) {
+      lines.push(`...and ${warningDishes.length - 5} more`);
     }
   }
 
