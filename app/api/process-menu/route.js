@@ -250,28 +250,33 @@ Return the JSON now:`;
       });
     });
 
-    const extractionDir = path.join(process.cwd(), 'tmp', 'menu-extractions');
-    fs.mkdirSync(extractionDir, { recursive: true });
-
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const extractionFilename = `menu-extraction-${timestamp}.json`;
-    const extractionPath = path.join(extractionDir, extractionFilename);
+    let extractionPath = null;
 
-    fs.writeFileSync(
-      extractionPath,
-      JSON.stringify(
-        {
-          savedAt: new Date().toISOString(),
-          sourceImageCount: files.length,
-          model,
-          targetLanguage,
-          rawResponse: menuData,
-          normalizedMenu,
-        },
-        null,
-        2
-      )
-    );
+    try {
+      const extractionDir = path.join('/tmp', 'menu-extractions');
+      fs.mkdirSync(extractionDir, { recursive: true });
+      extractionPath = path.join(extractionDir, extractionFilename);
+
+      fs.writeFileSync(
+        extractionPath,
+        JSON.stringify(
+          {
+            savedAt: new Date().toISOString(),
+            sourceImageCount: files.length,
+            model,
+            targetLanguage,
+            rawResponse: menuData,
+            normalizedMenu,
+          },
+          null,
+          2
+        )
+      );
+    } catch (writeError) {
+      console.warn('Skipping local extraction dump:', writeError);
+    }
 
     return NextResponse.json({
       menu: normalizedMenu,
