@@ -24,7 +24,7 @@ export default function SavedMenusPage() {
   }, []);
 
   const handleOpenMenu = (menuId) => {
-    router.push(`/?menu=${menuId}`);
+    router.push(`/menu/${menuId}`);
   };
 
   const handleDeleteMenu = async (menuId) => {

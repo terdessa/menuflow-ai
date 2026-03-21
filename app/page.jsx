@@ -1,8 +1,7 @@
 'use client';
 
 import { Suspense, useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import MenuCard from '@/components/MenuCard';
 import FilterPanel from '@/components/FilterPanel';
 import Navigation from '@/components/Navigation';
@@ -41,6 +40,7 @@ export default function HomePage() {
 }
 
 function HomePageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [preferences] = useState(() => getPreferences());
   const [menu, setMenu] = useState(null);
@@ -49,7 +49,6 @@ function HomePageContent() {
   const [uploading, setUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [currentMenuId, setCurrentMenuId] = useState(null);
-  const shareUrl = currentMenuId ? `/menu/${currentMenuId}` : '';
 
   const hasMissingImages = (menuData) =>
     Boolean(
@@ -147,7 +146,8 @@ function HomePageContent() {
             menu: normalizedMenu,
           }).then((saved) => {
             if (saved?.id) {
-              setCurrentMenuId(saved.id);
+              router.push(saved.publicUrl || `/menu/${saved.id}`);
+              return;
             }
 
             setMenu(saved?.menu || normalizedMenu);
@@ -161,7 +161,7 @@ function HomePageContent() {
           setUploadedFiles([]);
         });
     }
-  }, [uploadedFiles, menu]);
+  }, [uploadedFiles, menu, router]);
 
   const handleFileUpload = (e) => {
     const files = Array.from(e.target.files);
@@ -248,14 +248,6 @@ function HomePageContent() {
             <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
               <h2 className="text-2xl font-bold">Menu</h2>
               <div className="flex flex-wrap items-center gap-3">
-                {shareUrl && (
-                  <Link
-                    href={shareUrl}
-                    className="rounded-lg border border-[var(--border)] bg-[var(--card-bg)] px-4 py-2 text-sm font-medium transition-colors hover:bg-[var(--border)]"
-                  >
-                    Shareable Page
-                  </Link>
-                )}
                 <button
                   onClick={() => setIsFilterOpen(true)}
                   className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--card-bg)] px-4 py-2 font-medium transition-colors hover:bg-[var(--border)]"

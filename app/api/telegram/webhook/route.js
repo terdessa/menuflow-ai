@@ -391,7 +391,7 @@ async function handlePhotoMessage(sql, chatId, message) {
 
     const savedMenu = await saveRes.json();
     const menuId = savedMenu.id;
-    const menuUrl = `${APP_URL}/?menu=${menuId}`;
+    const menuUrl = `${APP_URL}/menu/${menuId}`;
 
     // Build personalized summary based on user's preferences
     const user = await getTelegramUser(sql, chatId);
