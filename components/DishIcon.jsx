@@ -3,36 +3,6 @@
 import { ICON_TYPES } from '@/lib/constants';
 
 const iconConfig = {
-  [ICON_TYPES.VEGAN]: {
-    label: 'Vegan',
-    emoji: '🌱',
-    color: 'bg-green-100 text-green-700',
-  },
-  [ICON_TYPES.VEGETARIAN]: {
-    label: 'Vegetarian',
-    emoji: '🥗',
-    color: 'bg-emerald-100 text-emerald-700',
-  },
-  [ICON_TYPES.PESCATARIAN]: {
-    label: 'Pescatarian',
-    emoji: '🐟',
-    color: 'bg-cyan-100 text-cyan-700',
-  },
-  [ICON_TYPES.HALAL]: {
-    label: 'Halal',
-    emoji: '🕌',
-    color: 'bg-blue-100 text-blue-700',
-  },
-  [ICON_TYPES.GLUTEN_FREE]: {
-    label: 'Gluten-free',
-    emoji: '🌾',
-    color: 'bg-amber-100 text-amber-700',
-  },
-  [ICON_TYPES.SUGAR_FREE]: {
-    label: 'Sugar-free',
-    emoji: '🍬',
-    color: 'bg-pink-100 text-pink-700',
-  },
   [ICON_TYPES.ALLERGEN_WARNING]: {
     label: 'Contains allergens',
     emoji: '⚠️',
@@ -59,4 +29,3 @@ export default function DishIcon({ type, className = '' }) {
     </span>
   );
 }
-

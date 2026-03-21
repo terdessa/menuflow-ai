@@ -8,6 +8,13 @@ import Navigation from '@/components/Navigation';
 import { getPreferences, saveMenu, getMenuById, updateSavedMenu } from '@/lib/storage';
 import { MENU_SECTIONS, ICON_TYPES, CURRENCIES } from '@/lib/constants';
 
+const DEFAULT_FILTERS = {
+  allergies: [],
+  customAllergies: '',
+  excludeIngredients: [],
+  spiceTolerance: 'medium',
+};
+
 export default function HomePage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-[var(--background)]" />}>
@@ -20,29 +27,7 @@ function HomePageContent() {
   const searchParams = useSearchParams();
   const [preferences, setPreferences] = useState(null);
   const [menu, setMenu] = useState(null);
-  const [filters, setFilters] = useState({
-    dietTypes: [],
-    customDietTypes: '',
-    allergies: [],
-    customAllergies: '',
-    excludeIngredients: [],
-    currency: 'GBP',
-    language: 'en',
-    spiceTolerance: 'medium',
-    alcoholEnabled: true,
-    alcoholTypes: ['wine', 'beer', 'cocktail', 'prosecco', 'spirits', 'champagne', 'sake', 'cider'],
-    imagesEnabled: true,
-    imageStyle: 'detailed',
-    imageCategories: ['starters', 'mains', 'desserts', 'drinks', 'soups', 'salads'],
-    speedPreference: 'normal',
-    texturePreferences: [],
-    cookingStyles: [],
-    portionSharing: 'alone',
-    tastePreferences: [],
-    meatPreferences: [],
-    customInstructions: '',
-    showImages: true,
-  });
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
@@ -167,29 +152,13 @@ function HomePageContent() {
     if (stored) {
       setPreferences(stored);
       setFilters({
-        dietTypes: stored.dietTypes || [],
-        customDietTypes: stored.customDietTypes || '',
+        ...DEFAULT_FILTERS,
         allergies: stored.allergies || [],
         customAllergies: stored.customAllergies || '',
         excludeIngredients: stored.dislikedIngredients
           ? stored.dislikedIngredients.split(',').map((i) => i.trim())
           : [],
-        currency: stored.currency || 'GBP',
-        language: stored.language || 'en',
         spiceTolerance: stored.spiceTolerance || 'medium',
-        alcoholEnabled: stored.alcoholEnabled !== undefined ? stored.alcoholEnabled : true,
-        alcoholTypes: stored.alcoholTypes || ['wine', 'beer', 'cocktail', 'prosecco', 'spirits', 'champagne', 'sake', 'cider'],
-        imagesEnabled: stored.imagesEnabled !== undefined ? stored.imagesEnabled : true,
-        imageStyle: stored.imageStyle || 'detailed',
-        imageCategories: stored.imageCategories || ['starters', 'mains', 'desserts', 'drinks', 'soups', 'salads'],
-        speedPreference: stored.speedPreference || 'normal',
-        texturePreferences: stored.texturePreferences || [],
-        cookingStyles: stored.cookingStyles || [],
-        portionSharing: stored.portionSharing || 'alone',
-        tastePreferences: stored.tastePreferences || [],
-        meatPreferences: stored.meatPreferences || [],
-        customInstructions: stored.customInstructions || '',
-        showImages: true,
       });
     }
 
@@ -202,15 +171,14 @@ function HomePageContent() {
         setMenu(savedMenu.menu);
 
         // Generate images for saved menu only if some are missing
-        const currentPrefs = getPreferences();
         const hasMissingImages = Object.keys(savedMenu.menu || {}).some((section) =>
           (savedMenu.menu?.[section] || []).some((dish) => !dish.imageUrl)
         );
-        if (currentPrefs?.imagesEnabled !== false && hasMissingImages) {
+        if (hasMissingImages) {
           setTimeout(() => {
             generateImagesForMenu(
               savedMenu.menu,
-              currentPrefs?.imageStyle || 'detailed',
+              'detailed',
               menuId
             );
           }, 100);
@@ -276,15 +244,7 @@ function HomePageContent() {
           // Generate images asynchronously in the background
           // Images will update individually as they complete
           setTimeout(() => {
-            const currentPrefs = getPreferences();
-            if (currentPrefs?.imagesEnabled !== false) {
-              // Generate images using the normalized menu we just set
-              generateImagesForMenu(
-                normalizedMenu,
-                currentPrefs?.imageStyle || 'detailed',
-                savedMenuId
-              );
-            }
+            generateImagesForMenu(normalizedMenu, 'detailed', savedMenuId);
           }, 100);
         })
         .catch((error) => {
@@ -311,78 +271,26 @@ function HomePageContent() {
     const stored = getPreferences();
     if (stored) {
       setFilters({
-        dietTypes: stored.dietTypes || [],
-        customDietTypes: stored.customDietTypes || '',
+        ...DEFAULT_FILTERS,
         allergies: stored.allergies || [],
         customAllergies: stored.customAllergies || '',
         excludeIngredients: stored.dislikedIngredients
           ? stored.dislikedIngredients.split(',').map((i) => i.trim())
           : [],
-        currency: stored.currency || 'GBP',
-        language: stored.language || 'en',
         spiceTolerance: stored.spiceTolerance || 'medium',
-        alcoholEnabled: stored.alcoholEnabled !== undefined ? stored.alcoholEnabled : true,
-        alcoholTypes: stored.alcoholTypes || ['wine', 'beer', 'cocktail', 'prosecco', 'spirits', 'champagne', 'sake', 'cider'],
-        imagesEnabled: stored.imagesEnabled !== undefined ? stored.imagesEnabled : true,
-        imageStyle: stored.imageStyle || 'detailed',
-        imageCategories: stored.imageCategories || ['starters', 'mains', 'desserts', 'drinks', 'soups', 'salads'],
-        speedPreference: stored.speedPreference || 'normal',
-        texturePreferences: stored.texturePreferences || [],
-        cookingStyles: stored.cookingStyles || [],
-        portionSharing: stored.portionSharing || 'alone',
-        tastePreferences: stored.tastePreferences || [],
-        meatPreferences: stored.meatPreferences || [],
-        customInstructions: stored.customInstructions || '',
-        showImages: true,
       });
     } else {
       // Reset to defaults if no preferences stored
-      setFilters({
-        dietTypes: [],
-        customDietTypes: '',
-        allergies: [],
-        customAllergies: '',
-        excludeIngredients: [],
-        currency: 'GBP',
-        language: 'en',
-        spiceTolerance: 'medium',
-        alcoholEnabled: true,
-        alcoholTypes: ['wine', 'beer', 'cocktail', 'prosecco', 'spirits', 'champagne', 'sake', 'cider'],
-        imagesEnabled: true,
-        imageStyle: 'detailed',
-        imageCategories: ['starters', 'mains', 'desserts', 'drinks', 'soups', 'salads'],
-        speedPreference: 'normal',
-        texturePreferences: [],
-        cookingStyles: [],
-        portionSharing: 'alone',
-        tastePreferences: [],
-        meatPreferences: [],
-        customInstructions: '',
-        showImages: true,
-      });
+      setFilters(DEFAULT_FILTERS);
     }
   };
 
   const handleFilterChange = (newFilters) => {
-    const imagesJustEnabled = !filters.imagesEnabled && newFilters.imagesEnabled;
-
     setFilters(newFilters);
-
-    // If images were just enabled, generate images for current menu
-    if (imagesJustEnabled && newFilters.showImages && menu) {
-      // Check if any dishes are missing images
-      const hasMissingImages = Object.keys(menu).some((section) =>
-        menu[section].some((dish) => !dish.imageUrl)
-      );
-
-      if (hasMissingImages) {
-        generateImagesForMenu(menu, newFilters.imageStyle, currentMenuId);
-      }
-    }
   };
 
   const filteredMenu = menu ? filterMenu(menu, filters) : null;
-  const selectedCurrency = CURRENCIES.find((c) => c.value === filters.currency);
+  const selectedCurrency = CURRENCIES.find((c) => c.value === 'GBP');
 
   return (
     <div className="min-h-screen bg-[var(--background)] pb-24">
@@ -463,8 +371,7 @@ function HomePageContent() {
                           key={`${sectionName}-${index}-${dish.imageUrl || 'no-image'}`}
                           dish={dish}
                           currency={selectedCurrency}
-                          showImages={filters.imagesEnabled && filters.showImages}
-                          imageStyle={filters.imageStyle}
+                          showImages
                         />
                       ))}
                     </div>
@@ -497,34 +404,6 @@ function filterMenu(menu, filters) {
     filtered[section] = menu[section].filter((dish) => {
       const filterProps = dish.filterProperties || {};
 
-      // Filter by diet types (multiple selection)
-      if (filters.dietTypes.length > 0) {
-        // If omnivore is selected, show all dishes
-        if (filters.dietTypes.includes('omnivore')) {
-          // Omnivore shows everything, so no filtering needed
-        } else {
-          // Check if dish matches any of the selected diet types
-          const matchesDiet = filters.dietTypes.some((dietType) => {
-            // First check filterProperties from API
-            if (filterProps.dietTypes && filterProps.dietTypes.includes(dietType)) {
-              return true;
-            }
-            // Fallback to icons for backward compatibility
-            const hasMatchingIcon = dish.icons?.some((icon) => {
-              if (dietType === 'vegan') return icon === ICON_TYPES.VEGAN || icon === 'vegan';
-              if (dietType === 'vegetarian') return icon === ICON_TYPES.VEGETARIAN || icon === 'vegetarian';
-              if (dietType === 'pescatarian') return icon === ICON_TYPES.PESCATARIAN || icon === 'pescatarian';
-              if (dietType === 'halal') return icon === ICON_TYPES.HALAL || icon === 'halal';
-              if (dietType === 'gluten-free') return icon === ICON_TYPES.GLUTEN_FREE || icon === 'gluten-free';
-              if (dietType === 'sugar-free') return icon === ICON_TYPES.SUGAR_FREE || icon === 'sugar-free';
-              return false;
-            });
-            return hasMatchingIcon;
-          });
-          if (!matchesDiet) return false;
-        }
-      }
-
       // Filter by allergies
       if (filters.allergies.length > 0) {
         // Check filterProperties from API
@@ -556,45 +435,6 @@ function filterMenu(menu, filters) {
         const userSpiceIndex = spiceLevels.indexOf(filters.spiceTolerance);
         const dishSpiceIndex = spiceLevels.indexOf(filterProps.spiceLevel);
         if (dishSpiceIndex > userSpiceIndex) return false;
-      }
-
-      // Filter by alcohol
-      if (!filters.alcoholEnabled && filterProps.alcoholType) {
-        return false;
-      }
-      if (filters.alcoholEnabled && filters.alcoholTypes.length > 0 && filterProps.alcoholType) {
-        if (!filters.alcoholTypes.includes(filterProps.alcoholType)) {
-          return false;
-        }
-      }
-
-      // Filter by cooking styles
-      if (filters.cookingStyles.length > 0 && filterProps.cookingStyle) {
-        if (!filters.cookingStyles.includes(filterProps.cookingStyle)) {
-          return false;
-        }
-      }
-
-      // Filter by taste preferences
-      if (filters.tastePreferences.length > 0 && filterProps.tasteProfile) {
-        const hasMatchingTaste = filters.tastePreferences.some((taste) =>
-          filterProps.tasteProfile.includes(taste)
-        );
-        if (!hasMatchingTaste) return false;
-      }
-
-      // Filter by texture preferences
-      if (filters.texturePreferences.length > 0 && filterProps.texture) {
-        if (!filters.texturePreferences.includes(filterProps.texture)) {
-          return false;
-        }
-      }
-
-      // Filter by meat preferences
-      if (filters.meatPreferences.length > 0 && filterProps.meatType) {
-        if (!filters.meatPreferences.includes(filterProps.meatType)) {
-          return false;
-        }
       }
 
       return true;

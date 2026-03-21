@@ -2,7 +2,7 @@ import "./globals.css";
 
 export const metadata = {
   title: "MenuFlow AI",
-  description: "Scan restaurant menus, apply dietary filters, and generate dish visuals.",
+  description: "Scan restaurant menus, apply allergen filters, and generate dish visuals.",
 };
 
 export default function RootLayout({ children }) {

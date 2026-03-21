@@ -1,5 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 
 export const runtime = 'nodejs';
 
@@ -53,9 +55,8 @@ export async function POST(request) {
         "name": "Item name",
         "ingredients": "List of ingredients",
         "price": 12.99,
-        "icons": ["vegetarian", "vegan", "gluten-free", "recommended"],
+        "icons": ["allergen-warning", "recommended"],
         "filterProperties": {
-          "dietTypes": ["vegetarian", "vegan"],
           "allergies": [],
           "spiceLevel": "mild",
           "alcoholType": null,
@@ -78,7 +79,6 @@ IMPORTANT RULES:
 1. Use ONLY these section names: "Soups", "Salads", "Starters", "Main dishes", "Desserts", "Drinks"
 2. For each item, include ALL available information from the menu
 3. For filterProperties:
-   - dietTypes: array of applicable diet types from: ["vegetarian", "vegan", "pescatarian", "halal", "gluten-free", "sugar-free"]
    - allergies: array of allergens present: ["nuts", "gluten", "dairy", "eggs", "seafood", "soy", "shellfish", "sesame", "sulfites", "mustard", "celery", "lupin", "molluscs"]
    - spiceLevel: one of "none", "mild", "medium", "hot", "very-hot"
    - alcoholType: one of ["wine", "beer", "cocktail", "prosecco", "spirits", "champagne", "sake", "cider"] or null
@@ -86,12 +86,13 @@ IMPORTANT RULES:
    - tasteProfile: array from: ["sweet", "savoury", "salty", "sour", "bitter", "umami", "spicy", "tangy"]
    - texture: one of ["crispy", "soft", "creamy", "crunchy", "tender", "smooth", "chewy", "flaky"] or null
    - meatType: one of ["chicken", "beef", "pork", "lamb", "turkey", "duck", "seafood", "fish"] or null
-4. Add "recommended" to icons array for popular or chef's special items
-5. Extract prices accurately - use numbers only (no currency symbols)
-6. Translate names and ingredients into ${targetLanguage}; if text is already in ${targetLanguage}, keep it as is
-7. Return ONLY valid JSON, no markdown, no code blocks, no explanations
-8. If a section has no items, use an empty array
-9. Analyze ingredients carefully to determine filter properties
+4. Add "allergen-warning" to icons only when the dish contains one or more allergens
+5. Add "recommended" to icons array for popular or chef's special items
+6. Extract prices accurately - use numbers only (no currency symbols)
+7. Translate names and ingredients into ${targetLanguage}; if text is already in ${targetLanguage}, keep it as is
+8. Return ONLY valid JSON, no markdown, no code blocks, no explanations
+9. If a section has no items, use an empty array
+10. Analyze ingredients carefully to determine filter properties
 
 Return the JSON now:`;
 
@@ -156,7 +157,34 @@ Return the JSON now:`;
       }));
     });
 
-    return NextResponse.json({ menu: normalizedMenu });
+    const extractionDir = path.join(process.cwd(), 'tmp', 'menu-extractions');
+    fs.mkdirSync(extractionDir, { recursive: true });
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const extractionFilename = `menu-extraction-${timestamp}.json`;
+    const extractionPath = path.join(extractionDir, extractionFilename);
+
+    fs.writeFileSync(
+      extractionPath,
+      JSON.stringify(
+        {
+          savedAt: new Date().toISOString(),
+          sourceImageCount: files.length,
+          model,
+          targetLanguage,
+          rawResponse: menuData,
+          normalizedMenu,
+        },
+        null,
+        2
+      )
+    );
+
+    return NextResponse.json({
+      menu: normalizedMenu,
+      savedJsonPath: extractionPath,
+      savedJsonFilename: extractionFilename,
+    });
   } catch (error) {
     console.error('Error processing menu:', error);
     return NextResponse.json(

@@ -43,6 +43,7 @@ Thumbs.db
 # local data and temp files
 *.tmp
 *.temp
+tmp/
 test.jpeg
 
 # vercel

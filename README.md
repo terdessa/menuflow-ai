@@ -1,6 +1,6 @@
 # MenuFlow AI
 
-MenuFlow AI is a Next.js app for scanning restaurant menus, extracting structured dishes with Gemini, applying dietary filters, and saving menus locally for later review.
+MenuFlow AI is a Next.js app for scanning restaurant menus, extracting structured dishes with Gemini, applying allergen-focused filters, and saving menus locally for later review.
 
 ## Development
 
