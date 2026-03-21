@@ -99,10 +99,8 @@ function HomePageContent() {
     return () => clearInterval(interval);
   }, [currentMenuId, menu]);
 
-  // Process uploaded images through API
   useEffect(() => {
     if (uploadedFiles.length > 0 && !menu) {
-      // Upload images to API
       const formData = new FormData();
       uploadedFiles.forEach((file) => {
         formData.append('images', file);
@@ -134,17 +132,14 @@ function HomePageContent() {
             throw new Error(data.error);
           }
 
-          // Normalize menu data structure
           const normalizedMenu = data.menu || {};
 
-          // Ensure all sections exist
           MENU_SECTIONS.forEach((section) => {
             if (!normalizedMenu[section]) {
               normalizedMenu[section] = [];
             }
           });
 
-          // Auto-save menu
           return saveMenu({
             restaurantName: 'Uploaded Menu',
             location: 'Unknown',
@@ -163,18 +158,17 @@ function HomePageContent() {
           console.error('Error processing menu:', error);
           alert(`Failed to process menu: ${error.message}`);
           setUploading(false);
-          setUploadedFiles([]); // Reset to allow retry
+          setUploadedFiles([]);
         });
     }
   }, [uploadedFiles, menu]);
-
 
   const handleFileUpload = (e) => {
     const files = Array.from(e.target.files);
     if (files.length > 0) {
       setUploading(true);
       setUploadedFiles(files);
-      setMenu(null); // Reset menu to trigger new load
+      setMenu(null);
       setCurrentMenuId(null);
     }
   };
@@ -192,7 +186,6 @@ function HomePageContent() {
         spiceTolerance: stored.spiceTolerance || 'medium',
       });
     } else {
-      // Reset to defaults if no preferences stored
       setFilters(DEFAULT_FILTERS);
     }
   };
@@ -207,7 +200,6 @@ function HomePageContent() {
   return (
     <div className="min-h-screen bg-[var(--background)] pb-24">
       <main className="mx-auto max-w-7xl px-4 py-8">
-        {/* Upload Section */}
         {!menu && (
           <div className="mb-8">
             <div className="rounded-xl border-2 border-dashed border-[var(--border)] bg-[var(--card-bg)] p-12 text-center">
@@ -232,7 +224,7 @@ function HomePageContent() {
                 </p>
                 <button
                   onClick={() => document.getElementById('menu-upload').click()}
-                  className="rounded-lg bg-[var(--primary)] px-6 py-3 font-semibold text-white transition-all hover:bg-[var(--primary-hover)] shadow-md hover:shadow-lg"
+                  className="rounded-lg bg-[var(--primary)] px-6 py-3 font-semibold text-white shadow-md transition-all hover:bg-[var(--primary-hover)] hover:shadow-lg"
                 >
                   Choose Files
                 </button>
@@ -251,10 +243,8 @@ function HomePageContent() {
           </div>
         )}
 
-        {/* Menu Display */}
         {menu && (
           <>
-            {/* Controls */}
             <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
               <h2 className="text-2xl font-bold">Menu</h2>
               <div className="flex flex-wrap items-center gap-3">
@@ -283,7 +273,6 @@ function HomePageContent() {
               </div>
             )}
 
-            {/* Menu Sections */}
             <div className="space-y-8">
               {MENU_SECTIONS.map((sectionName) => {
                 const dishes = filteredMenu[sectionName] || [];
@@ -312,7 +301,6 @@ function HomePageContent() {
           </>
         )}
 
-        {/* Filter Panel */}
         <FilterPanel
           preferences={preferences}
           onFilterChange={handleFilterChange}
@@ -326,7 +314,6 @@ function HomePageContent() {
   );
 }
 
-// Filter menu based on user preferences
 function filterMenu(menu, filters) {
   const filtered = {};
 
@@ -334,23 +321,20 @@ function filterMenu(menu, filters) {
     filtered[section] = menu[section].filter((dish) => {
       const filterProps = dish.filterProperties || {};
 
-      // Filter by allergies
       if (filters.allergies.length > 0) {
-        // Check filterProperties from API
         if (filterProps.allergies && filterProps.allergies.length > 0) {
           const hasMatchingAllergen = filters.allergies.some((allergy) =>
             filterProps.allergies.includes(allergy)
           );
           if (hasMatchingAllergen) return false;
         }
-        // Fallback to allergen warning icon
+
         const hasAllergenWarning = dish.icons?.includes(
           ICON_TYPES.ALLERGEN_WARNING
         );
         if (hasAllergenWarning) return false;
       }
 
-      // Filter by excluded ingredients
       if (filters.excludeIngredients.length > 0) {
         const ingredients = dish.ingredients?.toLowerCase() || '';
         const hasExcluded = filters.excludeIngredients.some((excluded) =>
@@ -359,7 +343,6 @@ function filterMenu(menu, filters) {
         if (hasExcluded) return false;
       }
 
-      // Filter by spice tolerance
       if (filters.spiceTolerance && filterProps.spiceLevel) {
         const spiceLevels = ['none', 'mild', 'medium', 'hot', 'very-hot'];
         const userSpiceIndex = spiceLevels.indexOf(filters.spiceTolerance);

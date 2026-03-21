@@ -7,7 +7,10 @@ import {
   getSessionIdFromRequest,
   updateMenuForOwner,
 } from '@/lib/server/menu-store';
-import { generateMissingImagesForMenu, menuHasMissingImages } from '@/lib/server/generate-menu-images';
+import {
+  generateMissingImagesForMenu,
+  menuHasMissingImages,
+} from '@/lib/server/generate-menu-images';
 
 const withSession = (request) => {
   const existing = getSessionIdFromRequest(request);

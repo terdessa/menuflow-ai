@@ -70,7 +70,7 @@ export default function SavedMenusPage() {
             </p>
             <button
               onClick={() => router.push('/')}
-              className="rounded-lg bg-[var(--primary)] px-6 py-3 font-semibold text-white transition-all hover:bg-[var(--primary-hover)] shadow-md hover:shadow-lg"
+              className="rounded-lg bg-[var(--primary)] px-6 py-3 font-semibold text-white shadow-md transition-all hover:bg-[var(--primary-hover)] hover:shadow-lg"
             >
               Upload Menu
             </button>

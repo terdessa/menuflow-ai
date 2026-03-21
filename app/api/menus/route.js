@@ -39,6 +39,7 @@ export async function POST(request) {
     const { sessionId, isNew } = withSession(request);
     const payload = await request.json();
     const menu = await createMenuForOwner(sessionId, payload);
+
     after(async () => {
       try {
         await generateMissingImagesForMenu(menu.id, 'detailed');
@@ -46,6 +47,7 @@ export async function POST(request) {
         console.error('Background menu image generation failed:', error);
       }
     });
+
     const response = NextResponse.json({ menu }, { status: 201 });
     if (isNew) {
       attachSessionCookie(response, sessionId);
