@@ -1,4 +1,3 @@
-import { neon } from '@neondatabase/serverless';
 import { NextResponse } from 'next/server';
 import {
   sendMessage,
@@ -14,13 +13,6 @@ import {
   extractPreferencesFromVoice,
 } from '@/lib/telegram';
 
-function getSQL() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL is not configured');
-  }
-  return neon(process.env.DATABASE_URL);
-}
-
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 // ─── Main webhook handler ────────────────────────────────────────
@@ -29,17 +21,16 @@ export async function POST(request) {
   // Always return 200 to Telegram immediately to prevent retries
   try {
     const body = await request.json();
-    const sql = getSQL();
 
     // Handle callback queries (inline button taps)
     if (body.callback_query) {
-      await handleCallbackQuery(sql, body.callback_query);
+      await handleCallbackQuery(body.callback_query);
       return NextResponse.json({ ok: true });
     }
 
     // Handle regular messages
     if (body.message) {
-      await handleMessage(sql, body.message);
+      await handleMessage(body.message);
       return NextResponse.json({ ok: true });
     }
 
@@ -52,23 +43,23 @@ export async function POST(request) {
 
 // ─── Message handler ─────────────────────────────────────────────
 
-async function handleMessage(sql, message) {
+async function handleMessage(message) {
   const chatId = message.chat.id;
   const text = message.text?.trim() || '';
 
   // Ensure user exists
-  let user = await getTelegramUser(sql, chatId);
+  let user = await getTelegramUser(chatId);
   if (!user) {
-    user = await upsertTelegramUser(sql, chatId, { state: 'new' });
+    user = await upsertTelegramUser(chatId, { state: 'new' });
   }
 
   // Handle commands
   if (text === '/start') {
-    return startOnboarding(sql, chatId);
+    return startOnboarding(chatId);
   }
 
   if (text === '/preferences') {
-    return startOnboarding(sql, chatId);
+    return startOnboarding(chatId);
   }
 
   if (text === '/help') {
@@ -87,22 +78,22 @@ async function handleMessage(sql, message) {
 
   // Handle voice messages during onboarding
   if (message.voice && isOnboardingState(user.state)) {
-    return handleVoiceOnboarding(sql, chatId, message);
+    return handleVoiceOnboarding(chatId, message);
   }
 
   // Handle state-specific text input
   if (user.state === 'new' || user.state === 'awaiting_allergies') {
-    return startOnboarding(sql, chatId);
+    return startOnboarding(chatId);
   }
 
   if (user.state === 'awaiting_excludes') {
-    return handleExcludeIngredients(sql, chatId, text);
+    return handleExcludeIngredients(chatId, text);
   }
 
   // If user is ready, handle photo or text
   if (user.state === 'ready') {
     if (message.photo && message.photo.length > 0) {
-      return handlePhotoMessage(sql, chatId, message);
+      return handlePhotoMessage(chatId, message);
     }
     return sendMessage(
       chatId,
@@ -121,17 +112,17 @@ async function handleMessage(sql, message) {
         'Use /start to begin.'
       );
     }
-    return handlePhotoMessage(sql, chatId, message);
+    return handlePhotoMessage(chatId, message);
   }
 
   // Unknown state, restart
-  return startOnboarding(sql, chatId);
+  return startOnboarding(chatId);
 }
 
 // ─── Onboarding flow ─────────────────────────────────────────────
 
-async function startOnboarding(sql, chatId) {
-  await upsertTelegramUser(sql, chatId, { state: 'awaiting_allergies', allergies: [] });
+async function startOnboarding(chatId) {
+  await upsertTelegramUser(chatId, { state: 'awaiting_allergies', allergies: [] });
 
   return sendMessage(
     chatId,
@@ -148,21 +139,21 @@ async function startOnboarding(sql, chatId) {
 
 // ─── Callback query handler ──────────────────────────────────────
 
-async function handleCallbackQuery(sql, callbackQuery) {
+async function handleCallbackQuery(callbackQuery) {
   const chatId = callbackQuery.message.chat.id;
   const messageId = callbackQuery.message.message_id;
   const data = callbackQuery.data;
   const callbackId = callbackQuery.id;
 
-  let user = await getTelegramUser(sql, chatId);
+  let user = await getTelegramUser(chatId);
   if (!user) {
-    user = await upsertTelegramUser(sql, chatId, { state: 'new' });
+    user = await upsertTelegramUser(chatId, { state: 'new' });
   }
 
   // Handle preference restart command
   if (data === 'cmd:preferences') {
     await answerCallbackQuery(callbackId, 'Updating preferences...');
-    return startOnboarding(sql, chatId);
+    return startOnboarding(chatId);
   }
 
   // ─── Allergy selection ───────────────────────────────────────
@@ -170,9 +161,8 @@ async function handleCallbackQuery(sql, callbackQuery) {
     const value = data.replace('allergy:', '');
 
     if (value === 'done') {
-      // Move to spice tolerance step
       await answerCallbackQuery(callbackId, 'Allergies saved!');
-      await upsertTelegramUser(sql, chatId, { state: 'awaiting_spice' });
+      await upsertTelegramUser(chatId, { state: 'awaiting_spice' });
 
       const allergyList = user.allergies?.length > 0
         ? user.allergies.map((a) => a.charAt(0).toUpperCase() + a.slice(1)).join(', ')
@@ -188,8 +178,7 @@ async function handleCallbackQuery(sql, callbackQuery) {
     }
 
     if (value === 'none') {
-      // Clear all allergies
-      await upsertTelegramUser(sql, chatId, { allergies: [] });
+      await upsertTelegramUser(chatId, { allergies: [] });
       await answerCallbackQuery(callbackId, 'Cleared all allergies');
       return editMessageText(
         chatId,
@@ -206,7 +195,7 @@ async function handleCallbackQuery(sql, callbackQuery) {
       ? currentAllergies.filter((a) => a !== value)
       : [...currentAllergies, value];
 
-    await upsertTelegramUser(sql, chatId, { allergies: updatedAllergies });
+    await upsertTelegramUser(chatId, { allergies: updatedAllergies });
     await answerCallbackQuery(callbackId, currentAllergies.includes(value) ? `Removed ${value}` : `Added ${value}`);
 
     return editMessageText(
@@ -222,7 +211,7 @@ async function handleCallbackQuery(sql, callbackQuery) {
   if (data.startsWith('spice:')) {
     const spiceValue = data.replace('spice:', '');
     await answerCallbackQuery(callbackId, `Spice: ${spiceValue}`);
-    await upsertTelegramUser(sql, chatId, {
+    await upsertTelegramUser(chatId, {
       state: 'awaiting_excludes',
       spice_tolerance: spiceValue,
     });
@@ -243,21 +232,21 @@ async function handleCallbackQuery(sql, callbackQuery) {
 
 // ─── Exclude ingredients handler ─────────────────────────────────
 
-async function handleExcludeIngredients(sql, chatId, text) {
+async function handleExcludeIngredients(chatId, text) {
   if (text === '/skip') {
-    await upsertTelegramUser(sql, chatId, {
+    await upsertTelegramUser(chatId, {
       state: 'ready',
       exclude_ingredients: [],
     });
   } else {
     const ingredients = text.split(',').map((i) => i.trim().toLowerCase()).filter(Boolean);
-    await upsertTelegramUser(sql, chatId, {
+    await upsertTelegramUser(chatId, {
       state: 'ready',
       exclude_ingredients: ingredients,
     });
   }
 
-  const user = await getTelegramUser(sql, chatId);
+  const user = await getTelegramUser(chatId);
   const allergyList = user.allergies?.length > 0
     ? user.allergies.map((a) => a.charAt(0).toUpperCase() + a.slice(1)).join(', ')
     : 'None';
@@ -284,7 +273,7 @@ function isOnboardingState(state) {
   return ONBOARDING_STATES.includes(state);
 }
 
-async function handleVoiceOnboarding(sql, chatId, message) {
+async function handleVoiceOnboarding(chatId, message) {
   await sendMessage(chatId, '🎙 Processing your voice message...');
 
   try {
@@ -296,8 +285,7 @@ async function handleVoiceOnboarding(sql, chatId, message) {
     const audioBuffer = await downloadFile(fileInfo.file_path);
     const preferences = await extractPreferencesFromVoice(audioBuffer);
 
-    // Apply all extracted preferences at once and skip to ready
-    await upsertTelegramUser(sql, chatId, {
+    await upsertTelegramUser(chatId, {
       state: 'ready',
       allergies: preferences.allergies,
       spice_tolerance: preferences.spice_tolerance,
@@ -332,8 +320,7 @@ async function handleVoiceOnboarding(sql, chatId, message) {
 
 // ─── Photo handler (menu processing) ─────────────────────────────
 
-async function handlePhotoMessage(sql, chatId, message) {
-  // Send "processing" message
+async function handlePhotoMessage(chatId, message) {
   await sendMessage(chatId, '⏳ Processing your menu...');
 
   try {
@@ -373,7 +360,7 @@ async function handlePhotoMessage(sql, chatId, message) {
 
     const menuContent = menuData.menu || menuData;
 
-    // Save menu to database
+    // Save menu via /api/menus — response is { menu: { id, publicUrl, ... } }
     const saveRes = await fetch(`${APP_URL}/api/menus`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -389,12 +376,13 @@ async function handlePhotoMessage(sql, chatId, message) {
       return sendMessage(chatId, '❌ Menu was processed but could not be saved. Please try again.');
     }
 
-    const savedMenu = await saveRes.json();
+    const saveData = await saveRes.json();
+    const savedMenu = saveData.menu || saveData;
     const menuId = savedMenu.id;
     const menuUrl = `${APP_URL}/menu/${menuId}`;
 
     // Build personalized summary based on user's preferences
-    const user = await getTelegramUser(sql, chatId);
+    const user = await getTelegramUser(chatId);
     const summary = buildMenuSummary(menuContent, user);
 
     return sendMessage(
@@ -414,7 +402,7 @@ async function handlePhotoMessage(sql, chatId, message) {
 function buildMenuSummary(menu, user) {
   let totalDishes = 0;
   let safeCount = 0;
-  let warningDishes = [];
+  const warningDishes = [];
 
   const userAllergies = user?.allergies || [];
   const userSpice = user?.spice_tolerance || 'medium';
@@ -468,7 +456,6 @@ function buildMenuSummary(menu, user) {
     }
   }
 
-  // Show up to 5 allergy warnings
   if (warningDishes.length > 0) {
     lines.push('');
     lines.push('<b>Allergy alerts:</b>');

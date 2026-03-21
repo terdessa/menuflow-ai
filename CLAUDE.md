@@ -5,76 +5,73 @@
 Next.js 16 app (React 19) with Gemini AI for menu scanning and dish image generation.
 
 ### Data Flow
-- **Menu photos** → `/api/process-menu` (Gemini AI) → structured JSON with sections (Soups, Salads, Starters, Main dishes, Desserts, Drinks)
-- **Dish images** → `/api/generate-image` (Gemini) → saved to `/public/menu-images/`
-- **Menu storage** → Neon Postgres via `/api/menus` routes
-- **User preferences** → browser localStorage (not in DB, stays client-side)
-- **Telegram bot** → webhook at `/api/telegram/webhook` → onboarding flow (allergies, spice, excludes) → process menu photo → save to DB → reply with personalized summary + link
+- **Menu photos** → `/api/process-menu` (Gemini AI) → structured JSON
+- **Dish images** → server-side generation via `lib/server/generate-menu-images.js`
+- **Menu storage** → Upstash Redis via `lib/server/menu-store.js`, exposed through `/api/menus` routes
+- **User preferences** → browser localStorage (client-side only)
+- **Telegram bot** → webhook at `/api/telegram/webhook` → onboarding → process menu → save → reply with public link
+- **Telegram user state** → Upstash Redis (key pattern: `tg_user:{chatId}`)
+
+### Storage: Upstash Redis
+All persistent data uses Upstash Redis (NOT Neon Postgres):
+- Menus: `menu:{id}` — JSON with session-based ownership
+- Owner index: `menus:owner:{sessionId}` — array of menu IDs
+- Telegram users: `tg_user:{chatId}` — JSON with state, allergies, spice, excludes
 
 ### Key Files
 
 #### API Routes
-- `app/api/menus/route.js` — POST (save) + GET (list) menus in Neon Postgres
-- `app/api/menus/[id]/route.js` — GET / PUT / DELETE single menu
-- `app/api/telegram/webhook/route.js` — Telegram bot webhook handler
+- `app/api/menus/route.js` — POST/GET/DELETE menus (session cookie ownership)
+- `app/api/menus/[id]/route.js` — GET/PATCH/DELETE single menu
+- `app/api/telegram/webhook/route.js` — Telegram bot webhook
 - `app/api/process-menu/route.js` — Gemini menu extraction (DO NOT MODIFY)
 - `app/api/generate-image/route.js` — Gemini image generation (DO NOT MODIFY)
-- `app/api/delete-menu-images/route.js` — image cleanup (DO NOT MODIFY)
 
-#### Libraries
+#### Server Libraries
+- `lib/server/menu-store.js` — Redis CRUD for menus with session ownership
+- `lib/server/generate-menu-images.js` — server-side image generation
+- `lib/serverEnv.js` — server environment helpers
+
+#### Client Libraries
 - `lib/storage.js` — async API client for menus + localStorage for preferences
-- `lib/telegram.js` — Telegram Bot API helpers, keyboard builders, DB helpers for telegram_users
+- `lib/telegram.js` — Telegram Bot API, keyboard builders, Redis user state, Gemini voice extraction
 - `lib/constants.js` — app constants (DO NOT MODIFY)
 
 #### Pages
-- `app/page.jsx` — home page: upload menu photos, view/filter dishes, load saved menu via `?menu={id}`
+- `app/page.jsx` — home: upload menu photos, view/filter dishes, load via `?menu={id}`
+- `app/menu/[id]/page.jsx` — public shareable menu page
 - `app/saved/page.jsx` — list saved menus with async loading
-- `app/profile/page.jsx` — user preferences form (DO NOT MODIFY)
+- `app/profile/page.jsx` — user preferences form
 
-### Database (Neon Postgres)
-
-**Table: `menus`**
-```sql
-id TEXT PK, saved_at TIMESTAMP, restaurant_name TEXT, location TEXT, language TEXT, menu JSONB
-```
-
-**Table: `telegram_users`**
-```sql
-chat_id BIGINT PK, state TEXT, allergies TEXT[], spice_tolerance TEXT, exclude_ingredients TEXT[], created_at TIMESTAMP, updated_at TIMESTAMP
-```
-
-Setup script: `db/setup.sql`
+### API Response Shapes
+- `POST /api/menus` → `{ menu: { id, publicUrl, restaurantName, ... } }` (status 201)
+- `GET /api/menus` → `{ menus: [...] }`
+- `GET /api/menus/[id]` → `{ menu: { ... } }`
+- `PATCH /api/menus/[id]` → `{ menu: { ... } }`
+- `DELETE /api/menus/[id]` → `{ menu: { ... } }`
 
 ### Telegram Bot Conversation Flow
 1. `/start` → welcome with two options:
-   - **Voice shortcut:** send a voice message with all preferences → Gemini extracts allergies/spice/excludes in one shot → skip to ready
+   - **Voice shortcut:** voice message → Gemini extracts allergies/spice/excludes → skip to ready
    - **Manual:** allergy selection (inline keyboard toggles)
 2. → spice tolerance (5-option inline keyboard)
 3. → excluded ingredients (free text or /skip)
-4. → ready state: "Send me a menu photo!"
-5. Photo → process via `/api/process-menu` → save to DB → reply with personalized summary + link
+4. → ready: "Send me a menu photo!"
+5. Photo → `/api/process-menu` → save via `/api/menus` → reply with summary + `/menu/{id}` link
 6. `/preferences` → restart onboarding
-7. Voice messages during ANY onboarding state trigger Gemini voice extraction
 
 ### Environment Variables
 - `GEMINI_API_KEY` — Google Gemini API key
-- `DATABASE_URL` — Neon Postgres connection string
+- `GEMINI_MODEL` — Gemini model name
+- `UPSTASH_REDIS_REST_URL` — Upstash Redis URL
+- `UPSTASH_REDIS_REST_TOKEN` — Upstash Redis token
 - `TELEGRAM_BOT_TOKEN` — Telegram bot token from BotFather
 - `NEXT_PUBLIC_APP_URL` — App base URL for generating menu links
 - `NEXT_PUBLIC_IMAGE_GEN_RPM` — Rate limit for image generation
-- `GEMINI_MODEL` — Gemini model for menu processing
-- `NANOBANANA_API_KEY` / `NANOBANANA_MODEL` — Optional image gen provider
-
-### Column ↔ Property Mapping
-- DB `restaurant_name` ↔ JS `restaurantName`
-- DB `saved_at` ↔ JS `savedAt`
-- DB `spice_tolerance` ↔ JS `spice_tolerance`
-- DB `exclude_ingredients` ↔ JS `exclude_ingredients`
 
 ### DO NOT MODIFY
-- Any files in `components/`
-- `lib/constants.js`
-- `app/profile/page.jsx`
 - `app/api/process-menu/route.js`
 - `app/api/generate-image/route.js`
-- `app/api/delete-menu-images/route.js`
+- `lib/server/menu-store.js`
+- `lib/server/generate-menu-images.js`
+- `lib/constants.js`
