@@ -37,6 +37,16 @@ const LoaderIcon = () => (
   </svg>
 );
 
+const SparklesIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m12 3 1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3Z"/>
+    <path d="M5 3v4"/>
+    <path d="M3 5h4"/>
+    <path d="M19 14v4"/>
+    <path d="M17 16h4"/>
+  </svg>
+);
+
 const CloseIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
@@ -262,6 +272,24 @@ export default function PublicMenuClient({
               </span>
               {' \u2014 '}
               {currentSummary.safeCount} matches, {currentSummary.cautionCount} caution, {currentSummary.avoidCount} avoid
+            </div>
+          )}
+
+          {menuRecord.menuInsight && (
+            <div className="mt-3 rounded-2xl border border-[var(--border)] bg-[linear-gradient(135deg,rgba(198,134,66,0.12),rgba(198,134,66,0.03))] px-3.5 py-3 text-sm text-[var(--foreground)] shadow-sm">
+              <div className="flex items-start gap-2.5">
+                <span className="mt-0.5 inline-flex shrink-0 rounded-full bg-[var(--primary)]/12 p-1.5 text-[var(--primary)]">
+                  <SparklesIcon />
+                </span>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--primary)]">
+                    AI Menu Insight
+                  </p>
+                  <p className="mt-1 leading-5 text-[var(--foreground)]/90">
+                    {menuRecord.menuInsight}
+                  </p>
+                </div>
+              </div>
             </div>
           )}
         </div>

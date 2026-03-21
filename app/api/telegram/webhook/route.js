@@ -464,12 +464,14 @@ async function handlePhotoMessage(chatId, message) {
 
     const menuContent = menuData.menu || menuData;
     const menuTitle = menuData.menuTitle || 'Restaurant Menu';
+    const menuInsight = menuData.menuInsight || '';
 
     const saveRes = await fetch(`${APP_URL}/api/menus`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         restaurantName: menuTitle,
+        menuInsight,
         location: '',
         language: menuData.language || 'English',
         menu: menuContent,

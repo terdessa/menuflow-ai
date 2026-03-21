@@ -64,7 +64,8 @@ export async function POST(request) {
 
 {
   "menuMetadata": {
-    "suggestedTitle": "Restaurant name or concise cuisine title"
+    "suggestedTitle": "Restaurant name or concise cuisine title",
+    "shortInsight": "One short insight about the cuisine, specialties, or what is worth trying"
   },
   "sections": {
     "Soups": [
@@ -133,6 +134,7 @@ IMPORTANT RULES:
 14. If a non-drink, non-dessert dish could reasonably contain multiple allergens depending on how it is commonly prepared, include all plausible allergens in the allergies array
 15. Analyze ingredients carefully to determine filter properties and nutrition estimates
 16. Set menuMetadata.suggestedTitle to the best short heading for this menu. Prefer the restaurant name if visible; otherwise use a concise cuisine or menu title like "Japanese Restaurant Menu" or "Traditional Italian Menu"
+17. Set menuMetadata.shortInsight to a short, natural 1-2 sentence summary that helps a diner understand the restaurant or menu. Mention the cuisine focus, what the menu seems to specialize in, or what type of dishes are likely worth trying. Keep it concise, practical, and specific to the menu. Do not mention AI or uncertainty.
 
 Return the JSON now:`;
 
@@ -294,6 +296,38 @@ Return the JSON now:`;
       return 'Restaurant Menu';
     };
 
+    const inferMenuInsight = () => {
+      const candidate =
+        menuData.menuMetadata?.shortInsight ||
+        menuData.shortInsight ||
+        menuData.menuInsight ||
+        '';
+
+      const trimmed = String(candidate).trim();
+      if (trimmed) {
+        return trimmed;
+      }
+
+      const hasDesserts = normalizedMenu.Desserts.length > 0;
+      const hasDrinks = normalizedMenu.Drinks.length > 0;
+      const hasMains = normalizedMenu['Main dishes'].length > 0;
+      const hasStarters = normalizedMenu.Starters.length > 0;
+
+      if (hasMains && hasStarters) {
+        return 'This menu looks built around full savory dishes, so it is worth focusing on the starters and mains to get the clearest feel for the restaurant.';
+      }
+
+      if (hasDesserts && !hasMains && !hasStarters) {
+        return 'This menu appears to focus on sweet offerings, so it is worth exploring the dessert selection first.';
+      }
+
+      if (hasDrinks && !hasMains && !hasStarters && !hasDesserts) {
+        return 'This looks like a drinks-focused menu, so the best signal is likely in the house beverages and signature pours.';
+      }
+
+      return 'This menu highlights the restaurant’s core dishes, so it is worth scanning the standout mains and specials before ordering.';
+    };
+
     // Normalize each menu item to ensure consistent structure
     Object.keys(normalizedMenu).forEach((section) => {
       normalizedMenu[section] = normalizedMenu[section].map((item) => {
@@ -333,6 +367,7 @@ Return the JSON now:`;
     });
 
     const menuTitle = inferMenuTitle();
+    const menuInsight = inferMenuInsight();
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const extractionFilename = `menu-extraction-${timestamp}.json`;
@@ -352,6 +387,7 @@ Return the JSON now:`;
             model,
             targetLanguage,
             menuTitle,
+            menuInsight,
             rawResponse: menuData,
             normalizedMenu,
           },
@@ -366,6 +402,7 @@ Return the JSON now:`;
     return NextResponse.json({
       menu: normalizedMenu,
       menuTitle,
+      menuInsight,
       savedJsonPath: extractionPath,
       savedJsonFilename: extractionFilename,
     });

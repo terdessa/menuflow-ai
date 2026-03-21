@@ -2,34 +2,68 @@
 
 ## Summary
 
-Travellers often struggle to understand foreign restaurant menus, even when a direct translation is available. Literal translation rarely explains what a dish actually is, what ingredients it likely contains, whether it may trigger allergens, or whether the price is reasonable in the user's home currency. This creates hesitation, ordering mistakes, and a weaker dining experience while traveling.
+People do not struggle with restaurant menus only because they cannot translate the words. They struggle because a menu often assumes cultural context they do not have.
 
-## Who Has The Problem
+A traveler, expat, international student, or even a local trying an unfamiliar cuisine may be faced with dish names that mean little on their own. Even after translation, they still do not know what the dish actually is, what ingredients it likely includes, whether it may contain allergens, how spicy it might be, or what it may look like when served.
 
-- Primary users: International travellers dining in countries where they do not speak the local language fluently.
-- Secondary users: Expats, digital nomads, international students, and tourists with dietary restrictions.
-- Stakeholders: End users, restaurant discovery/travel platforms, and future business partners in food or travel.
+This creates a practical everyday problem: people are forced to make food decisions with incomplete context, under time pressure, in settings where mistakes are frustrating, expensive, or unsafe.
 
-## Current Pain Points
+## Core User Problem
 
-- Menu translations often convert words but not meaning, leaving dishes ambiguous.
-- Travellers cannot easily tell likely ingredients, allergens, or preparation style.
-- Foreign prices are harder to evaluate quickly without a mental currency conversion.
+When someone sits down in a restaurant with an unfamiliar menu, they need more than translation. They need understanding.
 
-## Why Existing Approaches Fall Short
+They need help answering questions like:
 
-- Standard translation apps focus on text accuracy, not food context or dish explanation.
-- Users still need to do separate searches to understand ingredients, cuisine, or allergy risks.
-- Menus usually do not include photos, so users must order without a clear expectation of what will arrive.
+- What is this dish, in plain language?
+- Is it something I would actually want to eat?
+- Could it contain ingredients I avoid?
+- Is it likely to be spicy?
+- Is it vegan or vegetarian?
+- What might it look like when it arrives?
 
-## Constraints
+Without these answers, ordering becomes guesswork.
 
-- Technical constraints: OCR quality, image quality, menu layout complexity, and regional dish ambiguity can affect output accuracy.
-- Business constraints: The product needs to deliver clear value quickly enough for casual travel use and potentially operate within tight inference-cost limits.
-- Time constraints: Users often need answers in seconds while seated in a restaurant and deciding what to order.
+## Who Has This Problem
+
+- Travelers in countries where they do not speak the local language
+- People exploring unfamiliar cuisines
+- Diners with allergies or dietary restrictions
+- Users who want more confidence before ordering
+- Groups sharing menus where different people have different preferences
+
+## Why Existing Tools Fall Short
+
+- Translation apps convert text, but not meaning.
+- Review apps help at the restaurant level, not at the dish level.
+- Most menus do not include clear allergen detail or useful dish descriptions.
+- Menu photos online are often missing, outdated, or unrelated to the exact dish.
+- Existing tools do not combine menu understanding with personal dietary context in the moment of choice.
+
+## Why This Matters
+
+This is not a niche travel inconvenience. It is a recurring decision problem in daily life.
+
+People eat out while traveling, at work, in multicultural cities, on holiday, with friends, or in restaurants they have never tried before. Every time the menu is unfamiliar, there is friction. That friction slows down decisions, reduces confidence, and increases the risk of ordering something disappointing or unsafe.
+
+## Product Opportunity
+
+The opportunity is to turn any menu into an understandable, visual, personalized decision interface.
+
+Instead of forcing users to piece together translations, guess ingredients, and search separately for context, the product should:
+
+- digitize the menu
+- explain each dish clearly
+- identify likely allergens and dietary fit
+- estimate spiciness
+- show what the dish may look like
+- personalize the result to the individual user
 
 ## Success Criteria
 
-- Users can scan a menu and understand each dish beyond literal translation.
-- The app provides useful context on ingredients, allergens, and approximate local-to-home-currency pricing.
-- Users feel more confident choosing food they actually want to eat.
+The product succeeds if a user can:
+
+- send a menu photo in seconds
+- understand the dishes without outside research
+- feel confident choosing what to order
+- share the same menu with others
+- see a personalized view based on their own preferences and restrictions
