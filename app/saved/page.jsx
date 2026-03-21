@@ -1,17 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Navigation from '@/components/Navigation';
 import { getSavedMenus, deleteMenuById, clearSavedMenus } from '@/lib/storage';
 
 export default function SavedMenusPage() {
   const router = useRouter();
-  const [menus, setMenus] = useState(() => getSavedMenus());
+  const [menus, setMenus] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getSavedMenus().then((data) => {
+      setMenus(data);
+      setLoading(false);
+    });
+  }, []);
 
   const handleOpenMenu = (menuId) => {
-    // In a real app, this would navigate to the menu view
-    // For now, we'll navigate to home and load the menu
     router.push(`/?menu=${menuId}`);
   };
 
@@ -44,7 +50,7 @@ export default function SavedMenusPage() {
       }
     }
 
-    deleteMenuById(menuId);
+    await deleteMenuById(menuId);
     setMenus((prev) => prev.filter((m) => m.id !== menuId));
   };
 
@@ -73,7 +79,7 @@ export default function SavedMenusPage() {
       }
     }
 
-    clearSavedMenus();
+    await clearSavedMenus();
     setMenus([]);
   };
 
@@ -97,7 +103,12 @@ export default function SavedMenusPage() {
           )}
         </div>
 
-        {menus.length === 0 ? (
+        {loading ? (
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--card-bg)] p-12 text-center">
+            <div className="mb-4 text-6xl">⏳</div>
+            <p className="text-[var(--text-secondary)]">Loading saved menus...</p>
+          </div>
+        ) : menus.length === 0 ? (
           <div className="rounded-xl border border-[var(--border)] bg-[var(--card-bg)] p-12 text-center">
             <div className="mb-4 text-6xl">📋</div>
             <h3 className="mb-2 text-xl font-semibold">No saved menus yet</h3>

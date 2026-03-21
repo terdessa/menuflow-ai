@@ -193,29 +193,31 @@ function HomePageContent() {
       });
     }
 
-    // Check if we should load a saved menu from URL
+    // Check if we should load a saved menu from URL (async)
     const menuId = searchParams.get('menu');
     if (menuId) {
-      const savedMenu = getMenuById(menuId);
-      if (savedMenu && savedMenu.menu) {
-        setCurrentMenuId(menuId);
-        setMenu(savedMenu.menu);
+      (async () => {
+        const savedMenu = await getMenuById(menuId);
+        if (savedMenu && savedMenu.menu) {
+          setCurrentMenuId(menuId);
+          setMenu(savedMenu.menu);
 
-        // Generate images for saved menu only if some are missing
-        const currentPrefs = getPreferences();
-        const hasMissingImages = Object.keys(savedMenu.menu || {}).some((section) =>
-          (savedMenu.menu?.[section] || []).some((dish) => !dish.imageUrl)
-        );
-        if (currentPrefs?.imagesEnabled !== false && hasMissingImages) {
-          setTimeout(() => {
-            generateImagesForMenu(
-              savedMenu.menu,
-              currentPrefs?.imageStyle || 'detailed',
-              menuId
-            );
-          }, 100);
+          // Generate images for saved menu only if some are missing
+          const currentPrefs = getPreferences();
+          const hasMissingImages = Object.keys(savedMenu.menu || {}).some((section) =>
+            (savedMenu.menu?.[section] || []).some((dish) => !dish.imageUrl)
+          );
+          if (currentPrefs?.imagesEnabled !== false && hasMissingImages) {
+            setTimeout(() => {
+              generateImagesForMenu(
+                savedMenu.menu,
+                currentPrefs?.imageStyle || 'detailed',
+                menuId
+              );
+            }, 100);
+          }
         }
-      }
+      })();
     }
   // generateImagesForMenu intentionally closes over the latest menu id for background image updates.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -232,17 +234,19 @@ function HomePageContent() {
         formData.append('images', file);
       });
 
-      fetch('/api/process-menu', {
-        method: 'POST',
-        body: formData,
-      })
-        .then((response) => {
+      (async () => {
+        try {
+          const response = await fetch('/api/process-menu', {
+            method: 'POST',
+            body: formData,
+          });
+
           if (!response.ok) {
             throw new Error(`API error: ${response.statusText}`);
           }
-          return response.json();
-        })
-        .then((data) => {
+
+          const data = await response.json();
+
           if (data.error) {
             throw new Error(data.error);
           }
@@ -257,8 +261,8 @@ function HomePageContent() {
             }
           });
 
-          // Auto-save menu
-          const saved = saveMenu({
+          // Auto-save menu (async)
+          const saved = await saveMenu({
             restaurantName: 'Uploaded Menu',
             location: 'Unknown',
             language: 'English',
@@ -286,13 +290,13 @@ function HomePageContent() {
               );
             }
           }, 100);
-        })
-        .catch((error) => {
+        } catch (error) {
           console.error('Error processing menu:', error);
           alert(`Failed to process menu: ${error.message}`);
           setUploading(false);
           setUploadedFiles([]); // Reset to allow retry
-        });
+        }
+      })();
     }
   // generateImagesForMenu intentionally stays out of deps to avoid retriggering uploads on re-render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
