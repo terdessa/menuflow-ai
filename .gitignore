@@ -12,6 +12,9 @@
 # coverage
 /coverage/
 
+# generated menu previews
+/public/menu-images/
+
 # logs
 npm-debug.log*
 yarn-debug.log*
@@ -40,10 +43,10 @@ Thumbs.db
 # local data and temp files
 *.tmp
 *.temp
+test.jpeg
 
 # vercel
 .vercel/
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts
