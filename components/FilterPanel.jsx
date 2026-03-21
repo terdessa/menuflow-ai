@@ -53,28 +53,31 @@ export default function FilterPanel({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
       <div className="relative max-h-[95vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--card-bg)] p-8 shadow-xl animate-fade-in">
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 rounded-full p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--border)]"
-          aria-label="Close"
-        >
-          ✕
-        </button>
-
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Filters</h2>
-          {onReset && (
+        <div className="mb-6 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-2xl font-bold">Filters</h2>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {onReset && (
+              <button
+                onClick={() => {
+                  const resetFilters = buildFilters(preferences);
+                  updateFilters(resetFilters);
+                  onReset();
+                }}
+                className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--border)]"
+              >
+                Reset
+              </button>
+            )}
             <button
-              onClick={() => {
-                const resetFilters = buildFilters(preferences);
-                updateFilters(resetFilters);
-                onReset();
-              }}
-              className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--border)]"
+              onClick={onClose}
+              className="rounded-full p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--border)]"
+              aria-label="Close"
             >
-              Reset
+              ✕
             </button>
-          )}
+          </div>
         </div>
 
         <div className="space-y-8">
