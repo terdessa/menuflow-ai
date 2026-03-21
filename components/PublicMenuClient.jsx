@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import MenuCard from '@/components/MenuCard';
 import { MENU_SECTIONS, CURRENCIES } from '@/lib/constants';
@@ -192,12 +191,6 @@ export default function PublicMenuClient({
                 Personalize for me
               </button>
             )}
-            <Link
-              href="/"
-              className="rounded-lg border border-[var(--border)] bg-[var(--card-bg)] px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--border)]"
-            >
-              Scan another menu
-            </Link>
           </div>
         </div>
 
@@ -221,7 +214,11 @@ export default function PublicMenuClient({
             <div className="flex flex-col gap-3 md:flex-row">
               <input
                 value={profileTokenInput}
-                onChange={(event) => setProfileTokenInput(event.target.value.toUpperCase())}
+                onChange={(event) =>
+                  setProfileTokenInput(
+                    event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')
+                  )
+                }
                 placeholder="Enter your Telegram profile code"
                 className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] px-4 py-3 text-sm outline-none"
               />

@@ -43,7 +43,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Profile token is required' }, { status: 400 });
     }
 
-    const profile = await getTelegramUserByProfileToken(profileToken.trim().toUpperCase());
+    const profile = await getTelegramUserByProfileToken(profileToken);
     if (!profile) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
     }
